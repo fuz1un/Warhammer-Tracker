@@ -1,0 +1,44 @@
+version: '3.9'
+
+services:
+
+  watcher:
+    build: ./watcher
+    container_name: wh-watcher
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./watcher/config.json:/app/config.json:ro
+      - wh-data:/app/data
+    environment:
+      # Alternativa ao config.json — podes definir aqui em vez de editar o ficheiro
+      # EMAIL_ENABLED: "true"
+      # EMAIL_USER: "exemplo@gmail.com"
+      # EMAIL_PASS: "xxxx xxxx xxxx xxxx"
+      # EMAIL_TO: "destino@email.com"
+      # DISCORD_ENABLED: "true"
+      # DISCORD_WEBHOOK: "https://discord.com/api/webhooks/..."
+      # INTERVAL_WATCHED: "2"
+      # INTERVAL_PREORDER: "10"
+      NODE_ENV: production
+    networks:
+      - wh-net
+
+  frontend:
+    build: ./frontend
+    container_name: wh-frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      - watcher
+    networks:
+      - wh-net
+
+volumes:
+  wh-data:
+
+networks:
+  wh-net:
+    driver: bridge
