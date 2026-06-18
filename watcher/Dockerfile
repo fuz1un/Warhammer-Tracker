@@ -5,15 +5,15 @@ RUN apk add --no-cache curl
 
 WORKDIR /app
 
-# 1. Copia o package.json que está fora da pasta watcher
+# 1. Copia o package.json que está na raiz do projeto (o context: . permite isto)
 COPY package*.json ./
 
-# 2. Instala as dependências (agora que o package.json existe aqui)
+# 2. Instala as dependências do projeto
 RUN npm install --omit=dev
 
-# 3. Copia o código e o frontend
-COPY server.js .
-COPY index.html .
+# 3. CORREÇÃO: Copia o backend e o frontend de dentro da pasta watcher/
+COPY watcher/server.js .
+COPY watcher/index.html .
 
 # Volume para persistir estado (watched list, last status)
 RUN mkdir -p /app/data
