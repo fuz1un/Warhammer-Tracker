@@ -1,24 +1,24 @@
-FROM node:20-alpine
+FROM node:20-slim
 
-# Instala o curl para o envio de e-mails via SMTP
-RUN apk add --no-cache curl
+# Instala o curl (necessário para o teu envio de e-mails por SMTP)
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# 1. Copia os ficheiros de dependências que estão na mesma pasta (raiz)
+# 1. Copia os ficheiros de dependências da raiz do projeto
 COPY package*.json ./
 
-# 2. Instala as dependências de forma limpa e isolada
-RUN npm install --omit=dev
+# 2. Instala as dependências de forma limpa e estável (Desativa os logs problemáticos do npm)
+RUN npm install --omit=dev --max-logs=0
 
-# 3. Copia o código e o frontend a partir da subpasta watcher/
+# 3. Copia o código do backend e do frontend para os locais esperados
 COPY watcher/server.js .
 COPY watcher/index.html .
 
-# Cria o volume para persistência de dados
+# Cria a pasta de dados para persistência
 RUN mkdir -p /app/data
 
-# Alinha com a porta da tua aplicação (3000)
+# Alinha a porta exposta com a porta real da aplicação (3000)
 EXPOSE 3000
 
 CMD ["node", "server.js"]
