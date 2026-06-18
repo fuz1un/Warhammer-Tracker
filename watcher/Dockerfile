@@ -5,10 +5,10 @@ RUN apk add --no-cache curl
 
 WORKDIR /app
 
-# 1. Copia os ficheiros de dependências primeiro
+# 1. Copia o package.json que está fora da pasta watcher
 COPY package*.json ./
 
-# 2. Instala as dependências necessárias (como o axios)
+# 2. Instala as dependências (agora que o package.json existe aqui)
 RUN npm install --omit=dev
 
 # 3. Copia o código e o frontend
