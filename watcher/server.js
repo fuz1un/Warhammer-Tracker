@@ -76,17 +76,21 @@ function log(msg) {
 }
 
 // ─── ALGOLIA ────────────────────────────────────────────
-function algoliaQuery(facetFilters) {
+const BOOK_ATTRIBUTES = [
+  'name', 'title', 'productCode', 'objectID', 'salePrice', 'price', 'language',
+  'productType', 'isAvailable', 'isPreOrder', 'isInStock', 'inStock',
+  'availability', 'stockStatus', 'onlineStockStatus', 'imageUrl', 'image_url',
+  'image', 'images', 'media', 'url', 'slug', 'range', 'format'
+];
+
+function algoliaQuery(facetFilters, page = 0, hitsPerPage = 250) {
   return new Promise((resolve, reject) => {
     const body = JSON.stringify({
-      hitsPerPage: 250,
-      page: 0,
+      hitsPerPage,
+      page,
       facets: ['productType', 'language', 'isAvailable', 'isPreOrder', 'range', 'format'],
       facetFilters,
-      attributesToRetrieve: [
-        'name', 'productCode', 'objectID', 'salePrice', 'language',
-        'productType', 'isAvailable', 'isPreOrder', 'imageUrl', 'url', 'range', 'format'
-      ]
+      attributesToRetrieve: BOOK_ATTRIBUTES
     });
 
     const options = {
@@ -105,7 +109,10 @@ function algoliaQuery(facetFilters) {
       let data = '';
       res.on('data', c => data += c);
       res.on('end', () => {
-        console.log('ALGOLIA RESPONSE:', data.substring(0, 500));
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          reject(new Error(`Algolia HTTP ${res.statusCode}: ${data.substring(0, 200)}`));
+          return;
+        }
         try { resolve(JSON.parse(data)); }
         catch(e) { reject(new Error('JSON inválido')); }
       });
@@ -117,18 +124,62 @@ function algoliaQuery(facetFilters) {
   });
 }
 
+function pickFirst(...values) {
+  return values.find(v => v !== undefined && v !== null && v !== '');
+}
+
+function truthy(v) {
+  if (v === true) return true;
+  if (v === false || v == null) return false;
+  return ['true', 'yes', 'available', 'in stock', 'instock', 'on sale', 'preorder', 'pre-order']
+    .includes(String(v).trim().toLowerCase());
+}
+
+function isSoldOut(h) {
+  const status = pickFirst(h.availability, h.stockStatus, h.onlineStockStatus, h.stock_status);
+  if (status == null) return false;
+  return ['false', 'no', 'sold out', 'soldout', 'out of stock', 'outofstock', 'unavailable']
+    .includes(String(status).trim().toLowerCase());
+}
+
+function normalizeImage(h) {
+  const candidate = pickFirst(
+    h.imageUrl,
+    h.image_url,
+    typeof h.image === 'string' ? h.image : null,
+    h.image?.url,
+    h.images?.[0]?.url,
+    h.images?.[0],
+    h.media?.[0]?.url,
+    h.media?.[0]?.src
+  );
+  if (!candidate) return null;
+  if (String(candidate).startsWith('//')) return 'https:' + candidate;
+  if (String(candidate).startsWith('/')) return 'https://www.warhammer.com' + candidate;
+  return String(candidate);
+}
+
+function formatPrice(value) {
+  if (value == null) return '—';
+  const numeric = parseFloat(String(value).replace(',', '.').replace(/[^\d.-]/g, ''));
+  return Number.isFinite(numeric) ? `€${numeric.toFixed(2)}` : String(value);
+}
+
 function normalizeBook(h) {
+  const preorder = truthy(h.isPreOrder);
+  const available = !isSoldOut(h) && (truthy(h.isAvailable) || truthy(h.isInStock) || truthy(h.inStock));
+  const price = pickFirst(h.salePrice, h.price);
   return {
     id:       h.productCode || h.objectID,
-    title:    h.name || '—',
-    price:    h.salePrice != null ? `€${parseFloat(h.salePrice).toFixed(2)}` : '—',
+    title:    h.name || h.title || '—',
+    price:    formatPrice(price),
     lang:     h.language    || 'en',
     type:     h.productType || 'book',
     format:   h.format      || null,
-    avail:    h.isAvailable === true || h.isAvailable === 'true',
-    preorder: h.isPreOrder  === true || h.isPreOrder  === 'true',
-    image:    h.imageUrl    || null,
-    url:      h.url         || null,
+    avail:    available,
+    preorder,
+    image:    normalizeImage(h),
+    url:      h.url || h.slug || null,
     range:    h.range       || null,
   };
 }
@@ -137,21 +188,27 @@ async function fetchBooks(tab) {
   const facetFilters = tab === 'preorder'
     ? [['isPreOrder:true'], ['productType:book']]
     : [['productType:book']];
-  const data = await algoliaQuery(facetFilters);
+  const allHits = [];
+  let page = 0;
+  let nbPages = 1;
 
-  console.log(
-    JSON.stringify(data, null, 2)
-  );
+  do {
+    const data = await algoliaQuery(facetFilters, page);
+    const hits = data.hits || data.results?.[0]?.hits || [];
+    allHits.push(...hits);
+    nbPages = Math.min(data.nbPages || data.results?.[0]?.nbPages || 1, 20);
+    page += 1;
+  } while (page < nbPages);
 
-  const hits =
-  data.hits ||
-  data.results?.[0]?.hits ||
-  [];
+  const seen = new Set();
+  const books = allHits.map(normalizeBook).filter(b => {
+    if (!b.id || seen.has(b.id)) return false;
+    seen.add(b.id);
+    return true;
+  });
 
-  if (!hits.length)
-    throw new Error('Sem hits');
-
-return hits.map(normalizeBook);
+  if (!books.length) throw new Error('Sem hits');
+  return books;
 }
 
 // ─── NOTIFICAÇÕES ───────────────────────────────────────

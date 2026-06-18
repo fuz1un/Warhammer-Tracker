@@ -218,6 +218,7 @@ select:focus{border-color:#c9a84c;outline:none}
 <script>
 const PROXY = window.location.origin;
 const WH_BASE = 'https://www.warhammer.com/en-EU/';
+const BOOK_ATTRIBUTES = ['name','title','productCode','objectID','salePrice','price','language','productType','isAvailable','isPreOrder','isInStock','inStock','availability','stockStatus','onlineStockStatus','imageUrl','image_url','image','images','media','url','slug','range','format'];
 let books=[], tab='preorder', watchOnly=false, serverOk=false;
 let watched = new Set(JSON.parse(localStorage.getItem('wh_w')||'[]'));
 
@@ -271,30 +272,94 @@ async function load(){
       const d=await r.json();
       books=(d.hits||[]);
     } else {
-      const ff=tab==='preorder'?[['isPreOrder:true'],['productType:book']]:[['productType:book']];
-      const r=await fetch('https://m5ziqznq2h-dsn.algolia.net/1/indexes/prod-lazarus-product-en-eu/query',{
-        method:'POST',
-        headers:{'X-Algolia-Application-Id':'m5ziqznq2h','X-Algolia-API-Key':'92c6a8254f9d34362df8e6d96475e5d8','Content-Type':'application/json'},
-        body:JSON.stringify({hitsPerPage:250,facetFilters:ff,attributesToRetrieve:['name','productCode','objectID','salePrice','language','productType','isAvailable','isPreOrder','imageUrl','url','range','format']})
-      });
-      const d=await r.json();
-      books=(d.hits||[]).map(norm);
+      books=await loadDirect(tab);
     }
+    books=dedupeBooks(books.map(norm));
     buildFilters(); updateTs(); applyFilters();
     const e=document.querySelector('.err-box'); if(e) e.remove();
   }catch(e){ showErr(e.message); }
   finally{ spin(false); }
 }
 
+function pickFirst(...values){ return values.find(v=>v!==undefined&&v!==null&&v!==''); }
+function truthy(v){
+  if(v===true) return true;
+  if(v===false||v==null) return false;
+  return ['true','yes','available','in stock','instock','on sale','preorder','pre-order'].includes(String(v).trim().toLowerCase());
+}
+function soldOut(h){
+  const s=pickFirst(h.availability,h.stockStatus,h.onlineStockStatus,h.stock_status);
+  return ['false','no','sold out','soldout','out of stock','outofstock','unavailable'].includes(String(s||'').trim().toLowerCase());
+}
+function imageOf(h){
+  const img=pickFirst(
+    h.imageUrl,
+    h.image_url,
+    typeof h.image==='string'?h.image:null,
+    h.image&&typeof h.image==='object'?h.image.url:null,
+    h.images?.[0]?.url,
+    h.images?.[0],
+    h.media?.[0]?.url,
+    h.media?.[0]?.src
+  );
+  if(!img) return null;
+  if(String(img).startsWith('//')) return 'https:'+img;
+  if(String(img).startsWith('/')) return 'https://www.warhammer.com'+img;
+  return String(img);
+}
+function shopUrl(path){
+  if(!path) return null;
+  if(String(path).startsWith('http')) return path;
+  const clean=String(path).replace(/^\/+/,'');
+  return clean.startsWith('en-')?`https://www.warhammer.com/${clean}`:WH_BASE+clean;
+}
+function formatPrice(value){
+  if(value==null) return '—';
+  const numeric=parseFloat(String(value).replace(',','.').replace(/[^\d.-]/g,''));
+  return Number.isFinite(numeric)?'€'+numeric.toFixed(2):String(value);
+}
 function norm(h){
+  if(h.avail!==undefined&&h.title!==undefined) return h;
+  const preorder=truthy(h.isPreOrder);
+  const available=!soldOut(h)&&(truthy(h.isAvailable)||truthy(h.isInStock)||truthy(h.inStock));
+  const rawPrice=pickFirst(h.salePrice,h.price);
   return {
-    id:h.productCode||h.objectID, title:h.name||'—',
-    price:h.salePrice!=null?'€'+parseFloat(h.salePrice).toFixed(2):'—',
+    id:h.productCode||h.objectID, title:h.name||h.title||'—',
+    price:formatPrice(rawPrice),
     lang:h.language||'en', type:h.productType||'book', format:h.format||null,
-    avail:h.isAvailable===true||h.isAvailable==='true',
-    preorder:h.isPreOrder===true||h.isPreOrder==='true',
-    image:h.imageUrl||null, url:h.url||null, range:h.range||null
+    avail:available,
+    preorder,
+    image:imageOf(h), url:h.url||h.slug||null, range:h.range||null
   };
+}
+
+function dedupeBooks(list){
+  const seen=new Set();
+  return list.filter(b=>{
+    if(!b.id||seen.has(b.id)) return false;
+    seen.add(b.id);
+    return true;
+  });
+}
+
+async function loadDirect(currentTab){
+  const ff=currentTab==='preorder'?[['isPreOrder:true'],['productType:book']]:[['productType:book']];
+  const all=[];
+  let page=0, nbPages=1;
+  do{
+    const r=await fetch('https://m5ziqznq2h-dsn.algolia.net/1/indexes/prod-lazarus-product-en-eu/query',{
+      method:'POST',
+      headers:{'X-Algolia-Application-Id':'m5ziqznq2h','X-Algolia-API-Key':'92c6a8254f9d34362df8e6d96475e5d8','Content-Type':'application/json'},
+      body:JSON.stringify({hitsPerPage:250,page,facetFilters:ff,attributesToRetrieve:BOOK_ATTRIBUTES})
+    });
+    if(!r.ok) throw new Error('Algolia HTTP '+r.status);
+    const d=await r.json();
+    const hits=d.hits||d.results?.[0]?.hits||[];
+    all.push(...hits);
+    nbPages=Math.min(d.nbPages||d.results?.[0]?.nbPages||1,20);
+    page++;
+  }while(page<nbPages);
+  return all;
 }
 
 function applyFilters(){
@@ -309,7 +374,7 @@ function applyFilters(){
     if(q&&!b.title.toLowerCase().includes(q)&&!(b.range||'').toLowerCase().includes(q)) return false;
     if(lang&&b.lang!==lang) return false;
     if(fmt&&b.format!==fmt) return false;
-    if(st==='avail'&&!b.avail) return false;
+    if(st==='avail'&&(!b.avail||b.preorder)) return false;
     if(st==='out'&&(b.avail||b.preorder)) return false;
     if(st==='pre'&&!b.preorder) return false;
     return true;
@@ -344,7 +409,7 @@ function render(list){
     const isW=watched.has(b.id);
     const sc=b.preorder?'pr':(b.avail?'av':'ou');
     const sl=b.preorder?'🕐 Pré-encomenda':(b.avail?'✅ Disponível':'❌ Esgotado');
-    const url=b.url?(b.url.startsWith('http')?b.url:WH_BASE+b.url):null;
+    const url=shopUrl(b.url);
     const img=b.image?`<img class="ci" src="${b.image}" alt="" loading="lazy" onerror="this.outerHTML='<div class=cp>📚</div>'">`:`<div class="cp">📚</div>`;
     return `<div class="card${isW?' w':''}">
       ${isW?'<span class="wb">🔔 A vigiar</span>':''}
