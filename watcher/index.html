@@ -272,9 +272,9 @@ async function load(){
       books=(d.hits||[]);
     } else {
       const ff=tab==='preorder'?[['isPreOrder:true'],['productType:book']]:[['productType:book']];
-      const r=await fetch('https://S7GRLRQQ5E-dsn.algolia.net/1/indexes/prod-lazarus-product-en-eu/query',{
+      const r=await fetch('https://m5ziqznq2h-dsn.algolia.net/1/indexes/prod-lazarus-product-en-eu/query',{
         method:'POST',
-        headers:{'X-Algolia-Application-Id':'S7GRLRQQ5E','X-Algolia-API-Key':'a3e3370abb3c3b9f27b7f1ad35a20e17','Content-Type':'application/json'},
+        headers:{'X-Algolia-Application-Id':'m5ziqznq2h','X-Algolia-API-Key':'a3e3370abb3c3b9f27b7f1ad35a20e17','Content-Type':'application/json'},
         body:JSON.stringify({hitsPerPage:250,facetFilters:ff,attributesToRetrieve:['name','productCode','objectID','salePrice','language','productType','isAvailable','isPreOrder','imageUrl','url','range','format']})
       });
       const d=await r.json();
