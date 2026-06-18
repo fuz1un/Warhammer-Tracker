@@ -1,17 +1,17 @@
-FROM node:20-slim
+FROM node:20-alpine
 
 # Instala o curl para o envio de e-mails via SMTP
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache curl
 
 WORKDIR /app
 
-# 1. CORREÇÃO DE CASE-SENSITIVITY: Aceita tanto package.json como package.JSON
-COPY package.[jJ][sS][oO][nN] ./
+# 1. CORREÇÃO: Como não tens o package.json, criamos um projeto Node mínimo na hora
+RUN npm init -y
 
-# 2. Instala as dependências de forma limpa e isolada
-RUN npm install --omit=dev --no-audit --no-fund
+# 2. Instala diretamente o axios (necessário para o teu server.js) de forma limpa
+RUN npm install axios --omit=dev
 
-# 3. Copia o código do backend e do frontend a partir da subpasta watcher/
+# 3. Copia o teu código de dentro da pasta watcher e o HTML para a raiz da app
 COPY watcher/server.js .
 COPY watcher/index.html .
 
