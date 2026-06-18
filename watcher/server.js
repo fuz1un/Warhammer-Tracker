@@ -361,7 +361,7 @@ function sendDiscord(alerts) {
   }
 
   const embeds = alerts.slice(0, 10).map(b => {
-    const url = b.url ? (b.url.startsWith('http') ? b.url : `https://www.warhammer.com/en-EU/${b.url}`) : null;
+    const url = b.url ? (b.url.startsWith('http') ? b.url : `https://www.warhammer.com/en-EU/shop/${b.url}`) : null;
     return {
       title: b.title,
       description: [
@@ -369,6 +369,7 @@ function sendDiscord(alerts) {
         b.format ? `📖 **Formato:** ${b.format}` : null,
         `💶 **Preço:** ${b.price}`,
         url ? `🔗 **[Comprar agora](${url})**` : null,
+        b.image ? `![image](${b.image})` : null
       ].filter(Boolean).join('\n'),
       color: 0x2ecc71,
       timestamp: new Date().toISOString(),
