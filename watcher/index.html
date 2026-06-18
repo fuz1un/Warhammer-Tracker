@@ -216,7 +216,7 @@ select:focus{border-color:#c9a84c;outline:none}
 <div id="toast"></div>
 
 <script>
-const PROXY   = 'http://localhost:3001';
+const PROXY = window.location.origin;
 const WH_BASE = 'https://www.warhammer.com/en-EU/';
 let books=[], tab='preorder', watchOnly=false, serverOk=false;
 let watched = new Set(JSON.parse(localStorage.getItem('wh_w')||'[]'));

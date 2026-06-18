@@ -1,19 +1,18 @@
 # ⚙ WH40K — Biblioteca Imperial
 
 Rastreador de livros Black Library com alertas de stock por email e Discord.
+**Um único container** serve o frontend e o backend.
 
 ## Estrutura
 
 ```
 wh-tracker/
 ├── docker-compose.yml
-├── watcher/
-│   ├── Dockerfile
-│   ├── server.js          ← proxy + watcher (porta 3001)
-│   └── config.example.json
-└── frontend/
+└── watcher/
     ├── Dockerfile
-    └── index.html         ← app web (porta 8080)
+    ├── server.js          ← servidor Node.js (frontend + proxy + watcher)
+    ├── index.html         ← app web
+    └── config.example.json
 ```
 
 ## Configuração rápida
@@ -23,13 +22,13 @@ wh-tracker/
    cp watcher/config.example.json watcher/config.json
    ```
 
-2. Edita `watcher/config.json` com os teus dados:
+2. Edita `watcher/config.json`:
    ```json
    {
      "emailEnabled": true,
-     "emailUser": "o-teu@gmail.com",
-     "emailPass": "xxxx xxxx xxxx xxxx",
-     "emailTo":   "o-teu@gmail.com",
+     "emailUser":    "o-teu@gmail.com",
+     "emailPass":    "xxxx xxxx xxxx xxxx",
+     "emailTo":      "o-teu@gmail.com",
      "discordEnabled": true,
      "discordWebhook": "https://discord.com/api/webhooks/..."
    }
@@ -40,66 +39,49 @@ wh-tracker/
    docker compose up -d
    ```
 
-4. Abre **http://localhost:8080** (ou http://IP-UNRAID:8080)
+4. Abre **http://localhost:8080**
+   No Unraid com Tailscale: **http://100.78.220.87:8080**
 
 ## Como obter a App Password do Gmail
 
 1. Vai a [myaccount.google.com](https://myaccount.google.com)
 2. Segurança → Verificação em dois passos (ativa se não estiver)
-3. Segurança → Palavras-passe de aplicações
-4. Cria uma para "WH Watcher" e copia os 16 caracteres
+3. Segurança → Palavras-passe de aplicações → Cria para "WH Watcher"
+4. Copia os 16 caracteres gerados
 
 ## Como obter o Webhook do Discord
 
-1. Abre o servidor Discord
-2. Clica no canal onde queres as notificações → Editar canal
-3. Integrações → Webhooks → Novo Webhook
-4. Copia o URL
+Canal Discord → Editar canal → Integrações → Webhooks → Novo Webhook → Copiar URL
 
-## Intervalos de verificação
+## Intervalos de verificação (padrão)
 
-| O que verifica       | Padrão | Recomendado            |
-|----------------------|--------|------------------------|
-| Livros vigiados      | 2 min  | 1-5 min                |
-| Pré-encomendas       | 10 min | 10 min (sextas: 5 min) |
-| Todos os livros      | 30 min | 30 min                 |
-
-A GW lança novidades às **sextas-feiras de manhã** (hora UK).
+| Tipo                 | Intervalo | Notas                          |
+|----------------------|-----------|--------------------------------|
+| Livros vigiados      | 2 min     | Alterável na app (Config)      |
+| Pré-encomendas       | 10 min    | A GW lança às sextas de manhã  |
 
 ## Comandos úteis
 
 ```bash
-# Iniciar
-docker compose up -d
+docker compose up -d          # Iniciar
+docker compose down           # Parar
+docker compose logs -f        # Ver logs
+docker compose up -d --build  # Rebuild após alterações
 
-# Ver logs em tempo real
-docker compose logs -f watcher
+# Testar notificações (ou usa o botão na app)
+curl -X POST http://localhost:8080/test-notify
 
-# Parar
-docker compose down
-
-# Rebuild após alterações
-docker compose up -d --build
-
-# Testar notificações (também disponível na UI em Config → Testar)
-curl -X POST http://localhost:3001/test-notify
-
-# Ver estado do servidor
-curl http://localhost:3001/health
+# Ver estado
+curl http://localhost:8080/health
 ```
 
-## No Unraid
+## No Unraid (container único via UI)
 
-**Opção A — Docker Compose (Unraid 7+):**
-- Settings → Docker → Compose → Add Stack
-- Cola o conteúdo do `docker-compose.yml`
-- Certifica-te que os ficheiros estão em `/mnt/user/appdata/wh-tracker/`
+- **Repository:** deixa vazio (usa build local) ou cria a imagem antes com `docker build`
+- **Name:** `wh-tracker`
+- **Port:** `8080:8080`
+- **Path 1:** Host `/mnt/user/appdata/wh-tracker/data` → Container `/app/data`
+- **Path 2:** Host `/mnt/user/appdata/wh-tracker/config.json` → Container `/app/config.json`
 
-**Opção B — Dois containers via UI:**
-- Cria `wh-watcher`: imagem `node:20-alpine`, porta `3001:3001`,
-  volume `/mnt/user/appdata/wh-tracker/watcher:/app`
-- Cria `wh-frontend`: imagem `nginx:alpine`, porta `8080:80`,
-  volume `/mnt/user/appdata/wh-tracker/frontend:/usr/share/nginx/html`
-
-Com **Tailscale** no Unraid, acedes à app de qualquer lado em
-`http://100.78.220.87:8080`
+Copia os ficheiros para `/mnt/user/appdata/wh-tracker/` via SSH ou File Manager,
+faz `docker build -t wh-tracker ./watcher` e usa a imagem `wh-tracker`.

@@ -1,13 +1,16 @@
 FROM node:20-alpine
 
-# curl para envio de email SMTP
+# curl para envio de email via SMTP
 RUN apk add --no-cache curl
 
 WORKDIR /app
-COPY server.js .
 
-# data/ é montado como volume para persistir estado
+# Código e frontend
+COPY server.js .
+COPY index.html .
+
+# Volume para persistir estado (watched list, last status)
 RUN mkdir -p /app/data
 
-EXPOSE 3001
+EXPOSE 8080
 CMD ["node", "server.js"]
