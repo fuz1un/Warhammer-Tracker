@@ -21,7 +21,7 @@ function loadConfig() {
     try { file = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')); } catch(e) {}
   }
   return {
-    algoliaApp: process.env.ALGOLIA_APP  || file.algoliaApp  || 'm5ziqznq2h',
+    algoliaApp: process.env.ALGOLIA_APP || file.algoliaApp || 'M5ZIQZNQ2H',
     algoliaKey: process.env.ALGOLIA_KEY  || file.algoliaKey  || '92c6a8254f9d34362df8e6d96475e5d8',
     algoliaIdx: process.env.ALGOLIA_IDX  || file.algoliaIdx  || 'prod-lazarus-product-en-eu',
     port:       parseInt(process.env.PORT || file.port || 8080),
