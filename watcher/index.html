@@ -81,7 +81,8 @@ select:focus{border-color:#c9a84c;outline:none}
 .card.w{border-color:rgba(201,168,76,.38)}
 .card.w::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:#c9a84c}
 .wb{position:absolute;top:8px;right:8px;background:#c9a84c;color:#000;font-size:9px;font-weight:800;border-radius:3px;padding:2px 6px;z-index:2}
-.ci{width:100%;height:160px;object-fit:cover;display:block}
+.imgbox{width:100%;height:160px;background:radial-gradient(circle at 50% 42%,#2b281f 0%,#151515 62%,#0d0d0d 100%);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.ci{width:100%;height:100%;object-fit:contain;display:block;mix-blend-mode:multiply;filter:contrast(1.08) saturate(1.08)}
 .cp{width:100%;height:160px;background:linear-gradient(135deg,#181818,#251a08);display:flex;align-items:center;justify-content:center;color:rgba(201,168,76,.1);font-size:56px}
 .cb{padding:12px;display:flex;flex-direction:column;flex:1}
 .ct{font-size:12px;font-weight:600;color:#ddd;line-height:1.4;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
@@ -218,7 +219,7 @@ select:focus{border-color:#c9a84c;outline:none}
 <script>
 const PROXY = window.location.origin;
 const WH_BASE = 'https://www.warhammer.com/en-EU/';
-const BOOK_ATTRIBUTES = ['name','title','productCode','objectID','salePrice','price','language','productType','isAvailable','isPreOrder','isInStock','inStock','availability','stockStatus','onlineStockStatus','imageUrl','image_url','image','images','media','url','slug','range','format'];
+const BOOK_ATTRIBUTES = ['name','title','productCode','objectID','salePrice','price','language','productType','isAvailable','isPreOrder','isInStock','inStock','availability','stockStatus','onlineStockStatus','imageUrl','image_url','image','images','media','url','slug','productUrl','canonicalUrl','path','range','format','bookFormat','productFormat'];
 let books=[], tab='preorder', watchOnly=false, serverOk=false;
 let watched = new Set(JSON.parse(localStorage.getItem('wh_w')||'[]'));
 
@@ -309,27 +310,69 @@ function imageOf(h){
 }
 function shopUrl(path){
   if(!path) return null;
-  if(String(path).startsWith('http')) return path;
+  if(String(path).startsWith('http')){
+    return String(path).replace(/(warhammer\.com\/en-[a-z]{2}\/)(?!shop\/)/i,'$1shop/');
+  }
   const clean=String(path).replace(/^\/+/,'');
-  return clean.startsWith('en-')?`https://www.warhammer.com/${clean}`:WH_BASE+clean;
+  if(clean.includes('/shop/')) return `https://www.warhammer.com/${clean}`;
+  if(clean.startsWith('en-')) return `https://www.warhammer.com/${clean.replace(/^(en-[a-z]{2})\//i,'$1/shop/')}`;
+  return WH_BASE+'shop/'+clean;
 }
 function formatPrice(value){
   if(value==null) return '—';
   const numeric=parseFloat(String(value).replace(',','.').replace(/[^\d.-]/g,''));
   return Number.isFinite(numeric)?'€'+numeric.toFixed(2):String(value);
 }
+function rawText(value){
+  if(Array.isArray(value)) return rawText(value[0]);
+  if(value&&typeof value==='object') return rawText(value.name||value.label||value.value||value.title);
+  return value==null?'':String(value).trim();
+}
+function cleanKey(value){ return rawText(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/&amp;/g,'and').replace(/[^a-z0-9]+/g,' ').trim(); }
+function formatKey(value){
+  const key=cleanKey(value);
+  if(!key) return '';
+  if(key.includes('hardback')||key.includes('hardcover')) return 'hardback';
+  if(key.includes('paperback')||key.includes('softback')) return 'paperback';
+  if(key.includes('ebook')||key.includes('e book')||key.includes('digital')) return 'ebook';
+  if(key.includes('audio')) return 'audiobook';
+  if(key.includes('box')||key.includes('set')) return 'boxed-set';
+  if(key.includes('special')) return 'special-edition';
+  return key.replace(/\s+/g,'-');
+}
+function formatLabel(key,value){
+  const labels={'hardback':'Hardback','paperback':'Paperback','ebook':'eBook','audiobook':'Audiobook','boxed-set':'Boxed Set','special-edition':'Special Edition'};
+  return labels[key]||rawText(value)||key;
+}
+function langKey(value,title='',url=''){
+  const explicit=cleanKey(value);
+  const text=cleanKey([title,url].filter(Boolean).join(' '));
+  const source=explicit&&!['english','eng','en'].includes(explicit)?explicit:text+' '+explicit;
+  if(/\b(deutsch|german|deu|ger|de)\b/.test(source)||/-deu?tsch|-ger|-de-/.test(source)) return 'de';
+  if(/\b(francais|français|french|fra|fre|fr)\b/.test(source)||/-francais|-fra|-fre|-fr-/.test(source)) return 'fr';
+  if(/\b(espanol|español|spanish|spa|esp|es)\b/.test(source)||/-spa|-esp|-es-/.test(source)) return 'es';
+  if(/\b(italian|italiano|ita|it)\b/.test(source)||/-ita|-it-/.test(source)) return 'it';
+  if(/\b(polish|polski|polaco|pol|pl)\b/.test(source)||/-pol|-pl-/.test(source)) return 'pl';
+  if(/\b(portuguese|portugues|português|por|pt)\b/.test(source)||/-por|-pt-/.test(source)) return 'pt';
+  if(/\b(english|anglais|ingles|inglês|eng|en)\b/.test(source)||/-eng|-en-/.test(source)) return 'en';
+  return explicit.length===2?explicit:'';
+}
 function norm(h){
-  if(h.avail!==undefined&&h.title!==undefined) return h;
+  const title=h.title||h.name||'—';
+  const url=h.url||h.slug||h.productUrl||h.canonicalUrl||h.path||null;
+  const format=formatKey(h.format||h.bookFormat||h.productFormat);
+  const lang=langKey(h.lang||h.language,title,url);
+  if(h.avail!==undefined&&h.title!==undefined) return {...h,title,url,format,formatLabel:formatLabel(format,h.format),lang:lang||h.lang||''};
   const preorder=truthy(h.isPreOrder);
   const available=!soldOut(h)&&(truthy(h.isAvailable)||truthy(h.isInStock)||truthy(h.inStock));
   const rawPrice=pickFirst(h.salePrice,h.price);
   return {
-    id:h.productCode||h.objectID, title:h.name||h.title||'—',
+    id:h.productCode||h.objectID, title,
     price:formatPrice(rawPrice),
-    lang:h.language||'en', type:h.productType||'book', format:h.format||null,
+    lang, type:h.productType||'book', format, formatLabel:formatLabel(format,h.format),
     avail:available,
     preorder,
-    image:imageOf(h), url:h.url||h.slug||null, range:h.range||null
+    image:imageOf(h), url, range:h.range||null
   };
 }
 
@@ -386,11 +429,11 @@ function applyFilters(){
 function buildFilters(){
   const ln={en:'🇬🇧 Inglês',de:'🇩🇪 Alemão',fr:'🇫🇷 Francês',es:'🇪🇸 Espanhol',it:'🇮🇹 Italiano',pl:'🇵🇱 Polaco',pt:'🇵🇹 Português'};
   const langs=[...new Set(books.map(b=>b.lang).filter(Boolean))].sort();
-  const fmts=[...new Set(books.map(b=>b.format).filter(Boolean))].sort();
+  const fmts=[...new Map(books.filter(b=>b.format).map(b=>[b.format,b.formatLabel||b.format])).entries()].sort((a,b)=>a[1].localeCompare(b[1]));
   const lsel=document.getElementById('fl'); const cl=lsel.value;
   lsel.innerHTML='<option value="">Todos os idiomas</option>'+langs.map(l=>`<option value="${l}"${l===cl?' selected':''}>${ln[l]||l.toUpperCase()}</option>`).join('');
   const fsel=document.getElementById('ff'); const cf=fsel.value;
-  fsel.innerHTML='<option value="">Todos os formatos</option>'+fmts.map(f=>`<option value="${f}"${f===cf?' selected':''}>${f}</option>`).join('');
+  fsel.innerHTML='<option value="">Todos os formatos</option>'+fmts.map(([value,label])=>`<option value="${value}"${value===cf?' selected':''}>${label}</option>`).join('');
 }
 
 function render(list){
@@ -410,7 +453,7 @@ function render(list){
     const sc=b.preorder?'pr':(b.avail?'av':'ou');
     const sl=b.preorder?'🕐 Pré-encomenda':(b.avail?'✅ Disponível':'❌ Esgotado');
     const url=shopUrl(b.url);
-    const img=b.image?`<img class="ci" src="${b.image}" alt="" loading="lazy" onerror="this.outerHTML='<div class=cp>📚</div>'">`:`<div class="cp">📚</div>`;
+    const img=b.image?`<div class="imgbox"><img class="ci" src="${b.image}" alt="" loading="lazy" onerror="this.parentElement.outerHTML='<div class=cp>📚</div>'"></div>`:`<div class="cp">📚</div>`;
     return `<div class="card${isW?' w':''}">
       ${isW?'<span class="wb">🔔 A vigiar</span>':''}
       ${img}
@@ -418,8 +461,8 @@ function render(list){
         <div class="ct" title="${b.title}">${b.title}</div>
         <div class="cm">
           ${b.range?`<span class="mt">${b.range}</span>`:''}
-          ${b.format?`<span class="mt">${b.format}</span>`:''}
-          <span class="mt">${b.lang.toUpperCase()}</span>
+          ${b.format?`<span class="mt">${b.formatLabel||b.format}</span>`:''}
+          ${b.lang?`<span class="mt">${b.lang.toUpperCase()}</span>`:''}
         </div>
         <div class="cf">
           <span class="st ${sc}">${sl}</span>

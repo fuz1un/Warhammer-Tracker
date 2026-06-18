@@ -80,7 +80,8 @@ const BOOK_ATTRIBUTES = [
   'name', 'title', 'productCode', 'objectID', 'salePrice', 'price', 'language',
   'productType', 'isAvailable', 'isPreOrder', 'isInStock', 'inStock',
   'availability', 'stockStatus', 'onlineStockStatus', 'imageUrl', 'image_url',
-  'image', 'images', 'media', 'url', 'slug', 'range', 'format'
+  'image', 'images', 'media', 'url', 'slug', 'productUrl', 'canonicalUrl', 'path',
+  'range', 'format', 'bookFormat', 'productFormat'
 ];
 
 function algoliaQuery(facetFilters, page = 0, hitsPerPage = 250) {
@@ -165,21 +166,72 @@ function formatPrice(value) {
   return Number.isFinite(numeric) ? `€${numeric.toFixed(2)}` : String(value);
 }
 
+function rawText(value) {
+  if (Array.isArray(value)) return rawText(value[0]);
+  if (value && typeof value === 'object') return rawText(value.name || value.label || value.value || value.title);
+  return value == null ? '' : String(value).trim();
+}
+
+function cleanKey(value) {
+  return rawText(value)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/&amp;/g, 'and').replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function normalizeFormat(value) {
+  const key = cleanKey(value);
+  if (!key) return '';
+  if (key.includes('hardback') || key.includes('hardcover')) return 'hardback';
+  if (key.includes('paperback') || key.includes('softback')) return 'paperback';
+  if (key.includes('ebook') || key.includes('e book') || key.includes('digital')) return 'ebook';
+  if (key.includes('audio')) return 'audiobook';
+  if (key.includes('box') || key.includes('set')) return 'boxed-set';
+  if (key.includes('special')) return 'special-edition';
+  return key.replace(/\s+/g, '-');
+}
+
+function normalizeLanguage(value, title = '', url = '') {
+  const explicit = cleanKey(value);
+  const text = cleanKey([title, url].filter(Boolean).join(' '));
+  const source = explicit && !['english', 'eng', 'en'].includes(explicit) ? explicit : `${text} ${explicit}`;
+  if (/\b(deutsch|german|deu|ger|de)\b/.test(source) || /-deu?tsch|-ger|-de-/.test(source)) return 'de';
+  if (/\b(francais|french|fra|fre|fr)\b/.test(source) || /-francais|-fra|-fre|-fr-/.test(source)) return 'fr';
+  if (/\b(espanol|spanish|spa|esp|es)\b/.test(source) || /-spa|-esp|-es-/.test(source)) return 'es';
+  if (/\b(italian|italiano|ita|it)\b/.test(source) || /-ita|-it-/.test(source)) return 'it';
+  if (/\b(polish|polski|polaco|pol|pl)\b/.test(source) || /-pol|-pl-/.test(source)) return 'pl';
+  if (/\b(portuguese|portugues|por|pt)\b/.test(source) || /-por|-pt-/.test(source)) return 'pt';
+  if (/\b(english|anglais|ingles|eng|en)\b/.test(source) || /-eng|-en-/.test(source)) return 'en';
+  return explicit.length === 2 ? explicit : '';
+}
+
+function normalizeUrl(path) {
+  if (!path) return null;
+  const value = String(path);
+  if (value.startsWith('http')) return value.replace(/(warhammer\.com\/en-[a-z]{2}\/)(?!shop\/)/i, '$1shop/');
+  const clean = value.replace(/^\/+/, '');
+  if (clean.includes('/shop/')) return `https://www.warhammer.com/${clean}`;
+  if (clean.startsWith('en-')) return `https://www.warhammer.com/${clean.replace(/^(en-[a-z]{2})\//i, '$1/shop/')}`;
+  return `https://www.warhammer.com/en-EU/shop/${clean}`;
+}
+
 function normalizeBook(h) {
   const preorder = truthy(h.isPreOrder);
   const available = !isSoldOut(h) && (truthy(h.isAvailable) || truthy(h.isInStock) || truthy(h.inStock));
   const price = pickFirst(h.salePrice, h.price);
+  const title = h.name || h.title || '—';
+  const url = pickFirst(h.url, h.slug, h.productUrl, h.canonicalUrl, h.path);
+  const format = normalizeFormat(pickFirst(h.format, h.bookFormat, h.productFormat));
   return {
     id:       h.productCode || h.objectID,
-    title:    h.name || h.title || '—',
+    title,
     price:    formatPrice(price),
-    lang:     h.language    || 'en',
+    lang:     normalizeLanguage(h.language, title, url),
     type:     h.productType || 'book',
-    format:   h.format      || null,
+    format,
     avail:    available,
     preorder,
     image:    normalizeImage(h),
-    url:      h.url || h.slug || null,
+    url:      normalizeUrl(url),
     range:    h.range       || null,
   };
 }
