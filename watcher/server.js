@@ -354,7 +354,10 @@ function sendEmail(subject, htmlBody) {
 }
 
 function sendDiscord(alerts) {
-  if (!CONFIG.discordEnabled || !CONFIG.discordWebhook) return Promise.resolve();
+  if (!CONFIG.discordEnabled || !CONFIG.discordWebhook) {
+    log('[Discord] Notificação ignorada (configuração incompleta)');
+    return Promise.resolve();
+  }
 
   const embeds = alerts.slice(0, 10).map(b => {
     const url = b.url ? (b.url.startsWith('http') ? b.url : `https://www.warhammer.com/en-EU/${b.url}`) : null;
