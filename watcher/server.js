@@ -42,8 +42,8 @@ function loadConfig() {
     emailPass:    process.env.EMAIL_PASS    || file.emailPass    || '',
     emailTo:      process.env.EMAIL_TO      || file.emailTo      || '',
 
-    discordEnabled: process.env.DISCORD_ENABLED === 'true' || file.discordEnabled || false,
-    discordWebhook: process.env.DISCORD_WEBHOOK || file.discordWebhook || '',
+    discordEnabled: process.env.DISCORD_ENABLED === 'true' || file.discordEnabled || true,
+    discordWebhook: process.env.DISCORD_WEBHOOK || file.discordWebhook || 'https://discord.com/api/webhooks/1517298345910075593/IZotSE5ip9yGUDYGZDXgPhzAFDFoSddrTDwPHUCunyx0bMhDw56AssDoQ0z7KbBcfQMP',
 
     dataFile: resolveDataFile(process.env.DATA_FILE || file.dataFile),
   };
