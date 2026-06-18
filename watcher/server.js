@@ -22,7 +22,7 @@ function loadConfig() {
   }
   return {
     algoliaApp: process.env.ALGOLIA_APP  || file.algoliaApp  || 'm5ziqznq2h',
-    algoliaKey: process.env.ALGOLIA_KEY  || file.algoliaKey  || 'a3e3370abb3c3b9f27b7f1ad35a20e17',
+    algoliaKey: process.env.ALGOLIA_KEY  || file.algoliaKey  || '92c6a8254f9d34362df8e6d96475e5d8',
     algoliaIdx: process.env.ALGOLIA_IDX  || file.algoliaIdx  || 'prod-lazarus-product-en-eu',
     port:       parseInt(process.env.PORT || file.port || 8080),
 
@@ -102,6 +102,7 @@ function algoliaQuery(facetFilters) {
       let data = '';
       res.on('data', c => data += c);
       res.on('end', () => {
+        console.log('ALGOLIA RESPONSE:', data.substring(0, 500));
         try { resolve(JSON.parse(data)); }
         catch(e) { reject(new Error('JSON inválido')); }
       });
@@ -134,8 +135,20 @@ async function fetchBooks(tab) {
     ? [['isPreOrder:true'], ['productType:book']]
     : [['productType:book']];
   const data = await algoliaQuery(facetFilters);
-  if (!data.hits) throw new Error('Sem hits');
-  return data.hits.map(normalizeBook);
+
+  console.log(
+    JSON.stringify(data, null, 2)
+  );
+
+  const hits =
+  data.hits ||
+  data.results?.[0]?.hits ||
+  [];
+
+  if (!hits.length)
+    throw new Error('Sem hits');
+
+return hits.map(normalizeBook);
 }
 
 // ─── NOTIFICAÇÕES ───────────────────────────────────────
