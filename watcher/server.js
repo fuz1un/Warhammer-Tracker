@@ -53,6 +53,7 @@ let CONFIG = loadConfig();
 console.log('ALGOLIA APP:', CONFIG.algoliaApp);
 console.log('ALGOLIA KEY:', CONFIG.algoliaKey);
 console.log('ALGOLIA IDX:', CONFIG.algoliaIdx);
+console.log('Config:', { discordEnabled: CONFIG.discordEnabled, discordWebhook: CONFIG.discordWebhook, emailEnabled: CONFIG.emailEnabled, emailTo: CONFIG.emailTo, dataFile: CONFIG.dataFile });
 
 // ─── STATE ──────────────────────────────────────────────
 let state = { watched: [], lastStatus: {}, lastSeen: {} };
