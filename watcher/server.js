@@ -44,6 +44,9 @@ function loadConfig() {
 }
 
 let CONFIG = loadConfig();
+console.log('ALGOLIA APP:', CONFIG.algoliaApp);
+console.log('ALGOLIA KEY:', CONFIG.algoliaKey);
+console.log('ALGOLIA IDX:', CONFIG.algoliaIdx);
 
 // ─── STATE ──────────────────────────────────────────────
 let state = { watched: [], lastStatus: {}, lastSeen: {} };
