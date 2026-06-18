@@ -81,8 +81,8 @@ select:focus{border-color:#c9a84c;outline:none}
 .card.w{border-color:rgba(201,168,76,.38)}
 .card.w::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:#c9a84c}
 .wb{position:absolute;top:8px;right:8px;background:#c9a84c;color:#000;font-size:9px;font-weight:800;border-radius:3px;padding:2px 6px;z-index:2}
-.imgbox{width:100%;height:160px;background:radial-gradient(circle at 50% 42%,#2b281f 0%,#151515 62%,#0d0d0d 100%);display:flex;align-items:center;justify-content:center;overflow:hidden}
-.ci{width:100%;height:100%;object-fit:contain;display:block;mix-blend-mode:multiply;filter:contrast(1.08) saturate(1.08)}
+.imgbox{width:100%;height:160px;background:linear-gradient(180deg,#f3efe5 0%,#d8d0bf 100%);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.ci{width:100%;height:100%;object-fit:contain;display:block;filter:contrast(1.04) saturate(1.04)}
 .cp{width:100%;height:160px;background:linear-gradient(135deg,#181818,#251a08);display:flex;align-items:center;justify-content:center;color:rgba(201,168,76,.1);font-size:56px}
 .cb{padding:12px;display:flex;flex-direction:column;flex:1}
 .ct{font-size:12px;font-weight:600;color:#ddd;line-height:1.4;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
@@ -219,7 +219,7 @@ select:focus{border-color:#c9a84c;outline:none}
 <script>
 const PROXY = window.location.origin;
 const WH_BASE = 'https://www.warhammer.com/en-EU/';
-const BOOK_ATTRIBUTES = ['name','title','productCode','objectID','salePrice','price','language','productType','isAvailable','isPreOrder','isInStock','inStock','availability','stockStatus','onlineStockStatus','imageUrl','image_url','image','images','media','url','slug','productUrl','canonicalUrl','path','range','format','bookFormat','productFormat'];
+const BOOK_ATTRIBUTES = ['name','title','productCode','objectID','salePrice','price','language','productType','isAvailable','isPreOrder','isInStock','inStock','stockLevel','stockQuantity','quantityAvailable','inventory','isOrderable','orderable','purchasable','canAddToCart','addToCartDisabled','availability','availabilityStatus','productStatus','stockStatus','onlineStockStatus','imageUrl','image_url','image','images','media','url','slug','productUrl','canonicalUrl','path','range','format','bookFormat','productFormat'];
 let books=[], tab='preorder', watchOnly=false, serverOk=false;
 let watched = new Set(JSON.parse(localStorage.getItem('wh_w')||'[]'));
 
@@ -288,10 +288,21 @@ function truthy(v){
   if(v===false||v==null) return false;
   return ['true','yes','available','in stock','instock','on sale','preorder','pre-order'].includes(String(v).trim().toLowerCase());
 }
-function soldOut(h){
-  const s=pickFirst(h.availability,h.stockStatus,h.onlineStockStatus,h.stock_status);
-  return ['false','no','sold out','soldout','out of stock','outofstock','unavailable'].includes(String(s||'').trim().toLowerCase());
+function falsey(v){
+  if(v===false) return true;
+  if(v===true||v==null) return false;
+  return ['false','no','sold out','soldout','out of stock','outofstock','unavailable','disabled'].includes(String(v).trim().toLowerCase());
 }
+function soldOut(h){
+  const s=pickFirst(h.availability,h.availabilityStatus,h.productStatus,h.stockStatus,h.onlineStockStatus,h.stock_status);
+  const qty=pickFirst(h.stockLevel,h.stockQuantity,h.quantityAvailable,h.inventory);
+  if(s!=null&&falsey(s)) return true;
+  if(qty!==undefined&&qty!==null&&qty!==''&&Number(qty)<=0) return true;
+  if(falsey(h.isInStock)||falsey(h.inStock)||falsey(h.isOrderable)||falsey(h.orderable)||falsey(h.purchasable)||falsey(h.canAddToCart)) return true;
+  if(truthy(h.addToCartDisabled)) return true;
+  return false;
+}
+function buyable(h){ return truthy(h.canAddToCart)||truthy(h.purchasable)||truthy(h.isOrderable)||truthy(h.orderable)||truthy(h.isInStock)||truthy(h.inStock)||truthy(h.isAvailable); }
 function imageOf(h){
   const img=pickFirst(
     h.imageUrl,
@@ -329,15 +340,15 @@ function rawText(value){
   return value==null?'':String(value).trim();
 }
 function cleanKey(value){ return rawText(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/&amp;/g,'and').replace(/[^a-z0-9]+/g,' ').trim(); }
-function formatKey(value){
-  const key=cleanKey(value);
+function formatKey(value,...hints){
+  const key=cleanKey([value,...hints].filter(Boolean).join(' '));
   if(!key) return '';
+  if(key.includes('special edition')||key.includes('limited edition')||key.includes('collectors edition')||key.includes('collector s edition')) return 'special-edition';
   if(key.includes('hardback')||key.includes('hardcover')) return 'hardback';
   if(key.includes('paperback')||key.includes('softback')) return 'paperback';
   if(key.includes('ebook')||key.includes('e book')||key.includes('digital')) return 'ebook';
   if(key.includes('audio')) return 'audiobook';
   if(key.includes('box')||key.includes('set')) return 'boxed-set';
-  if(key.includes('special')) return 'special-edition';
   return key.replace(/\s+/g,'-');
 }
 function formatLabel(key,value){
@@ -360,11 +371,15 @@ function langKey(value,title='',url=''){
 function norm(h){
   const title=h.title||h.name||'—';
   const url=h.url||h.slug||h.productUrl||h.canonicalUrl||h.path||null;
-  const format=formatKey(h.format||h.bookFormat||h.productFormat);
+  const format=formatKey(h.format||h.bookFormat||h.productFormat,title,url);
   const lang=langKey(h.lang||h.language,title,url);
-  if(h.avail!==undefined&&h.title!==undefined) return {...h,title,url,format,formatLabel:formatLabel(format,h.format),lang:lang||h.lang||''};
+  if(h.avail!==undefined&&h.title!==undefined){
+    const hasStockFields=['isAvailable','isInStock','inStock','stockLevel','stockQuantity','quantityAvailable','inventory','isOrderable','orderable','purchasable','canAddToCart','addToCartDisabled','availability','availabilityStatus','productStatus','stockStatus','onlineStockStatus','stock_status'].some(k=>h[k]!==undefined);
+    const avail=hasStockFields?!soldOut(h)&&buyable(h):h.avail;
+    return {...h,title,url,format,formatLabel:formatLabel(format,h.format),lang:lang||h.lang||'',avail};
+  }
   const preorder=truthy(h.isPreOrder);
-  const available=!soldOut(h)&&(truthy(h.isAvailable)||truthy(h.isInStock)||truthy(h.inStock));
+  const available=!soldOut(h)&&buyable(h);
   const rawPrice=pickFirst(h.salePrice,h.price);
   return {
     id:h.productCode||h.objectID, title,
@@ -418,8 +433,8 @@ function applyFilters(){
     if(lang&&b.lang!==lang) return false;
     if(fmt&&b.format!==fmt) return false;
     if(st==='avail'&&(!b.avail||b.preorder)) return false;
-    if(st==='out'&&(b.avail||b.preorder)) return false;
-    if(st==='pre'&&!b.preorder) return false;
+    if(st==='out'&&b.avail) return false;
+    if(st==='pre'&&(!b.preorder||!b.avail)) return false;
     return true;
   });
   document.getElementById('cnt').textContent=filtered.length+' livro'+(filtered.length!==1?'s':'');
@@ -450,8 +465,8 @@ function render(list){
   }
   el.innerHTML='<div class="grid">'+list.map(b=>{
     const isW=watched.has(b.id);
-    const sc=b.preorder?'pr':(b.avail?'av':'ou');
-    const sl=b.preorder?'🕐 Pré-encomenda':(b.avail?'✅ Disponível':'❌ Esgotado');
+    const sc=!b.avail?'ou':(b.preorder?'pr':'av');
+    const sl=!b.avail?'❌ Esgotado':(b.preorder?'🕐 Pré-encomenda':'✅ Disponível');
     const url=shopUrl(b.url);
     const img=b.image?`<div class="imgbox"><img class="ci" src="${b.image}" alt="" loading="lazy" onerror="this.parentElement.outerHTML='<div class=cp>📚</div>'"></div>`:`<div class="cp">📚</div>`;
     return `<div class="card${isW?' w':''}">

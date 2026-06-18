@@ -4,6 +4,7 @@ FROM node:20-alpine
 RUN apk add --no-cache curl
 
 WORKDIR /app
+ENV DATA_FILE=/app/data/state.json
 
 # 1. CORREÇÃO: Como não tens o package.json, criamos um projeto Node mínimo na hora
 RUN npm init -y
@@ -17,8 +18,9 @@ COPY watcher/index.html .
 
 # Cria a pasta para persistência de dados
 RUN mkdir -p /app/data
+VOLUME ["/app/data"]
 
 # Porta onde o teu script (server.js) está a escutar
-EXPOSE 3000
+EXPOSE 8080
 
 CMD ["node", "server.js"]

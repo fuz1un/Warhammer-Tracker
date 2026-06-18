@@ -2,14 +2,16 @@ version: '3.9'
 
 services:
   wh-tracker:
-    build: ./watcher
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: wh-tracker
     restart: unless-stopped
     ports:
       - "8080:8080"
     volumes:
       - ./watcher/config.json:/app/config.json:ro
-      - wh-data:/app/data
+      - ./watcher/data:/app/data
     # Alternativa ao config.json: define aqui as variáveis de ambiente
     # environment:
     #   EMAIL_ENABLED: "true"
@@ -19,7 +21,5 @@ services:
     #   DISCORD_ENABLED: "true"
     #   DISCORD_WEBHOOK: "https://discord.com/api/webhooks/..."
     #   INTERVAL_WATCHED: "2"
-    #   INTERVAL_PREORDER: "10"
-
-volumes:
-  wh-data:
+      #   INTERVAL_PREORDER: "10"
+      #   DATA_FILE: "/app/data/state.json"

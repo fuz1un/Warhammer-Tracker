@@ -14,6 +14,12 @@ const path  = require('path');
 // ─── CONFIG ─────────────────────────────────────────────
 const CONFIG_FILE   = path.join(__dirname, 'config.json');
 const FRONTEND_FILE = path.join(__dirname, 'index.html');
+const DEFAULT_DATA_FILE = path.join(__dirname, 'data', 'state.json');
+
+function resolveDataFile(value) {
+  if (!value) return DEFAULT_DATA_FILE;
+  return path.isAbsolute(value) ? value : path.join(__dirname, value);
+}
 
 function loadConfig() {
   let file = {};
@@ -39,7 +45,7 @@ function loadConfig() {
     discordEnabled: process.env.DISCORD_ENABLED === 'true' || file.discordEnabled || false,
     discordWebhook: process.env.DISCORD_WEBHOOK || file.discordWebhook || '',
 
-    dataFile: process.env.DATA_FILE || file.dataFile || path.join(__dirname, 'data', 'state.json'),
+    dataFile: resolveDataFile(process.env.DATA_FILE || file.dataFile),
   };
 }
 
@@ -78,8 +84,10 @@ function log(msg) {
 // ─── ALGOLIA ────────────────────────────────────────────
 const BOOK_ATTRIBUTES = [
   'name', 'title', 'productCode', 'objectID', 'salePrice', 'price', 'language',
-  'productType', 'isAvailable', 'isPreOrder', 'isInStock', 'inStock',
-  'availability', 'stockStatus', 'onlineStockStatus', 'imageUrl', 'image_url',
+  'productType', 'isAvailable', 'isPreOrder', 'isInStock', 'inStock', 'stockLevel',
+  'stockQuantity', 'quantityAvailable', 'inventory', 'isOrderable', 'orderable',
+  'purchasable', 'canAddToCart', 'addToCartDisabled', 'availability', 'availabilityStatus',
+  'productStatus', 'stockStatus', 'onlineStockStatus', 'imageUrl', 'image_url',
   'image', 'images', 'media', 'url', 'slug', 'productUrl', 'canonicalUrl', 'path',
   'range', 'format', 'bookFormat', 'productFormat'
 ];
@@ -136,11 +144,25 @@ function truthy(v) {
     .includes(String(v).trim().toLowerCase());
 }
 
+function falsey(v) {
+  if (v === false) return true;
+  if (v === true || v == null) return false;
+  return ['false', 'no', 'sold out', 'soldout', 'out of stock', 'outofstock', 'unavailable', 'disabled']
+    .includes(String(v).trim().toLowerCase());
+}
+
 function isSoldOut(h) {
-  const status = pickFirst(h.availability, h.stockStatus, h.onlineStockStatus, h.stock_status);
-  if (status == null) return false;
-  return ['false', 'no', 'sold out', 'soldout', 'out of stock', 'outofstock', 'unavailable']
-    .includes(String(status).trim().toLowerCase());
+  const status = pickFirst(h.availability, h.availabilityStatus, h.productStatus, h.stockStatus, h.onlineStockStatus, h.stock_status);
+  const qty = pickFirst(h.stockLevel, h.stockQuantity, h.quantityAvailable, h.inventory);
+  if (status != null && falsey(status)) return true;
+  if (qty !== undefined && qty !== null && qty !== '' && Number(qty) <= 0) return true;
+  if (falsey(h.isInStock) || falsey(h.inStock) || falsey(h.isOrderable) || falsey(h.orderable) || falsey(h.purchasable) || falsey(h.canAddToCart)) return true;
+  if (truthy(h.addToCartDisabled)) return true;
+  return false;
+}
+
+function isBuyable(h) {
+  return truthy(h.canAddToCart) || truthy(h.purchasable) || truthy(h.isOrderable) || truthy(h.orderable) || truthy(h.isInStock) || truthy(h.inStock) || truthy(h.isAvailable);
 }
 
 function normalizeImage(h) {
@@ -178,15 +200,15 @@ function cleanKey(value) {
     .toLowerCase().replace(/&amp;/g, 'and').replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
-function normalizeFormat(value) {
-  const key = cleanKey(value);
+function normalizeFormat(value, ...hints) {
+  const key = cleanKey([value, ...hints].filter(Boolean).join(' '));
   if (!key) return '';
+  if (key.includes('special edition') || key.includes('limited edition') || key.includes('collectors edition') || key.includes('collector s edition')) return 'special-edition';
   if (key.includes('hardback') || key.includes('hardcover')) return 'hardback';
   if (key.includes('paperback') || key.includes('softback')) return 'paperback';
   if (key.includes('ebook') || key.includes('e book') || key.includes('digital')) return 'ebook';
   if (key.includes('audio')) return 'audiobook';
   if (key.includes('box') || key.includes('set')) return 'boxed-set';
-  if (key.includes('special')) return 'special-edition';
   return key.replace(/\s+/g, '-');
 }
 
@@ -216,11 +238,11 @@ function normalizeUrl(path) {
 
 function normalizeBook(h) {
   const preorder = truthy(h.isPreOrder);
-  const available = !isSoldOut(h) && (truthy(h.isAvailable) || truthy(h.isInStock) || truthy(h.inStock));
+  const available = !isSoldOut(h) && isBuyable(h);
   const price = pickFirst(h.salePrice, h.price);
   const title = h.name || h.title || '—';
   const url = pickFirst(h.url, h.slug, h.productUrl, h.canonicalUrl, h.path);
-  const format = normalizeFormat(pickFirst(h.format, h.bookFormat, h.productFormat));
+  const format = normalizeFormat(pickFirst(h.format, h.bookFormat, h.productFormat), title, url);
   return {
     id:       h.productCode || h.objectID,
     title,
