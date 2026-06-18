@@ -1,0 +1,21 @@
+{
+  "algoliaApp": "S7GRLRQQ5E",
+  "algoliaKey": "a3e3370abb3c3b9f27b7f1ad35a20e17",
+  "algoliaIdx": "prod-lazarus-product-en-eu",
+
+  "port": 3001,
+
+  "intervalWatched":  2,
+  "intervalPreorder": 10,
+  "intervalAll":      30,
+
+  "emailEnabled": true,
+  "emailHost":    "smtp.gmail.com",
+  "emailPort":    465,
+  "emailUser":    "o-teu-email@gmail.com",
+  "emailPass":    "xxxx xxxx xxxx xxxx",
+  "emailTo":      "o-teu-email@gmail.com",
+
+  "discordEnabled": true,
+  "discordWebhook": "https://discord.com/api/webhooks/XXXXXXXXXX/YYYYYYYYYYYY"
+}

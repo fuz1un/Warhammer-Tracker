@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WH40K — Biblioteca Imperial</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#111;color:#e8dcc8;font-family:'Inter',system-ui,sans-serif;min-height:100vh}
+.header{background:linear-gradient(180deg,#0a0a0a 0%,#1a0800 60%,#0a0a0a 100%);border-bottom:1px solid #c9a84c;padding:18px 24px 14px;position:relative;overflow:hidden}
+.header::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M40 8L46 28H66L50 40L57 60L40 48L23 60L30 40L14 28H34Z' fill='none' stroke='rgba(201,168,76,0.035)' stroke-width='1'/%3E%3C/svg%3E") repeat;pointer-events:none}
+.header-inner{position:relative;display:flex;align-items:center;justify-content:space-between}
+.header-left{display:flex;align-items:center;gap:14px}
+.aquila{font-size:30px;color:#c9a84c}
+.header h1{font-size:20px;font-weight:700;color:#c9a84c;letter-spacing:.06em;text-transform:uppercase}
+.header-sub{font-size:11px;color:#8a7f6e;letter-spacing:.1em;text-transform:uppercase;margin-top:2px}
+.header-btns{display:flex;gap:8px}
+.icon-btn{background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);border-radius:6px;padding:7px 12px;color:#c9a84c;cursor:pointer;font-size:12px;font-weight:600;transition:all .2s;display:flex;align-items:center;gap:6px;font-family:inherit}
+.icon-btn:hover{background:rgba(201,168,76,.16);border-color:rgba(201,168,76,.4)}
+.icon-btn svg{width:14px;height:14px;flex-shrink:0}
+.status-pill{display:flex;align-items:center;gap:6px;font-size:11px;padding:5px 12px;border-radius:20px;border:1px solid;font-weight:600}
+.pill-ok{background:rgba(46,204,113,.1);border-color:rgba(46,204,113,.3);color:#2ecc71}
+.pill-err{background:rgba(231,76,60,.1);border-color:rgba(231,76,60,.3);color:#e74c3c}
+.pill-dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.settings-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:flex-start;justify-content:flex-end;padding:70px 20px 20px}
+.settings-overlay.open{display:flex}
+.settings-panel{background:#1a1a1a;border:1px solid rgba(201,168,76,.3);border-radius:10px;width:400px;max-height:85vh;overflow-y:auto;padding:22px}
+.settings-panel h2{font-size:15px;font-weight:700;color:#c9a84c;margin-bottom:18px;display:flex;align-items:center;gap:8px}
+.s-section{margin-bottom:22px}
+.s-section h3{font-size:11px;font-weight:700;color:#8a7f6e;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid rgba(201,168,76,.1)}
+.field{margin-bottom:10px}
+.field label{display:block;font-size:11px;color:#8a7f6e;margin-bottom:4px;font-weight:500}
+.field input,.field select{width:100%;background:#111;border:1px solid rgba(201,168,76,.18);border-radius:5px;padding:8px 10px;color:#e8dcc8;font-size:13px;outline:none;font-family:inherit;transition:border-color .2s}
+.field input:focus,.field select:focus{border-color:#c9a84c}
+.field-row{display:flex;gap:8px}
+.field-row .field{flex:1}
+.toggle-row{display:flex;align-items:center;gap:10px;padding:6px 0}
+.toggle-row label{font-size:13px;color:#c0b49e;cursor:pointer;flex:1}
+.toggle-row input[type=checkbox]{width:16px;height:16px;flex-shrink:0;accent-color:#c9a84c;cursor:pointer}
+.btn-save{width:100%;background:#c9a84c;border:none;border-radius:6px;padding:10px;color:#000;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:4px}
+.btn-save:hover{opacity:.85}
+.btn-test{width:100%;background:transparent;border:1px solid rgba(201,168,76,.3);border-radius:6px;padding:9px;color:#c9a84c;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:8px}
+.btn-test:hover{background:rgba(201,168,76,.08)}
+.hint{font-size:11px;color:#5a5248;line-height:1.5;margin-top:5px}
+.hint a{color:#c9a84c}
+.tabs{display:flex;background:#0d0d0d;border-bottom:1px solid rgba(201,168,76,.15);padding:0 24px;gap:2px}
+.tab{padding:12px 18px;font-size:12px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:#6b6358;cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;transition:all .2s;display:flex;align-items:center;gap:7px;font-family:inherit}
+.tab:hover{color:#c0b49e}
+.tab.active{color:#c9a84c;border-bottom-color:#c9a84c}
+.tab svg{width:13px;height:13px;flex-shrink:0}
+.badge{background:#8b1a1a;color:#fff;font-size:10px;border-radius:10px;padding:1px 6px;font-weight:700}
+.controls{background:#141414;border-bottom:1px solid rgba(201,168,76,.12);padding:12px 24px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.search-wrap{flex:1;min-width:180px;position:relative}
+.search-wrap input{width:100%;background:#1c1c1c;border:1px solid rgba(201,168,76,.18);border-radius:6px;padding:8px 12px 8px 34px;color:#e8dcc8;font-size:13px;outline:none;transition:border-color .2s;font-family:inherit}
+.search-wrap input:focus{border-color:#c9a84c}
+.search-wrap input::placeholder{color:#5a5248}
+.s-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#5a5248;pointer-events:none}
+select{background:#1c1c1c;border:1px solid rgba(201,168,76,.18);border-radius:6px;padding:8px 28px 8px 11px;color:#e8dcc8;font-size:12px;outline:none;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238a7f6e' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;transition:border-color .2s;min-width:130px;font-family:inherit}
+select:focus{border-color:#c9a84c;outline:none}
+.btn-f{background:#1c1c1c;border:1px solid rgba(201,168,76,.18);border-radius:6px;padding:8px 13px;color:#6b6358;font-size:12px;cursor:pointer;transition:all .2s;font-weight:600;display:flex;align-items:center;gap:6px;font-family:inherit}
+.btn-f:hover{border-color:rgba(201,168,76,.4);color:#c0b49e}
+.btn-f.on{border-color:#c9a84c;color:#c9a84c;background:rgba(201,168,76,.08)}
+.count{font-size:11px;color:#6b6358;white-space:nowrap;align-self:center}
+.statusbar{background:#0a0a0a;padding:7px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(201,168,76,.1);font-size:11px;color:#6b6358;flex-wrap:wrap;gap:8px}
+.dots{display:flex;gap:14px;flex-wrap:wrap}
+.dot-item{display:flex;align-items:center;gap:5px}
+.dot{width:7px;height:7px;border-radius:50%}
+.dot.g{background:#2ecc71}.dot.r{background:#e74c3c}.dot.b{background:#3498db}.dot.y{background:#c9a84c}
+.rbar{display:flex;align-items:center;gap:10px}
+.rbtn{background:none;border:none;color:#6b6358;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:5px;transition:color .2s;font-family:inherit;padding:4px}
+.rbtn:hover{color:#c9a84c}
+.spin{animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#notif-area{padding:0 24px}
+.notif{background:rgba(46,204,113,.1);border:1px solid rgba(46,204,113,.28);border-radius:6px;padding:10px 16px;margin-top:10px;display:flex;align-items:flex-start;gap:10px;font-size:13px}
+.nc{margin-left:auto;background:none;border:none;color:#6b6358;cursor:pointer;font-size:18px;line-height:1;padding:0}
+.grid{padding:16px 24px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.card{background:#1a1a1a;border:1px solid rgba(201,168,76,.14);border-radius:8px;overflow:hidden;transition:border-color .2s,transform .15s;position:relative;display:flex;flex-direction:column}
+.card:hover{border-color:rgba(201,168,76,.32);transform:translateY(-2px)}
+.card.w{border-color:rgba(201,168,76,.38)}
+.card.w::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:#c9a84c}
+.wb{position:absolute;top:8px;right:8px;background:#c9a84c;color:#000;font-size:9px;font-weight:800;border-radius:3px;padding:2px 6px;z-index:2}
+.ci{width:100%;height:160px;object-fit:cover;display:block}
+.cp{width:100%;height:160px;background:linear-gradient(135deg,#181818,#251a08);display:flex;align-items:center;justify-content:center;color:rgba(201,168,76,.1);font-size:56px}
+.cb{padding:12px;display:flex;flex-direction:column;flex:1}
+.ct{font-size:12px;font-weight:600;color:#ddd;line-height:1.4;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.cm{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px}
+.mt{background:rgba(255,255,255,.06);border-radius:3px;padding:2px 6px;font-size:10px;color:#7a7060}
+.cf{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:8px}
+.st{font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;letter-spacing:.05em;text-transform:uppercase}
+.st.av{background:rgba(46,204,113,.14);color:#2ecc71;border:1px solid rgba(46,204,113,.28)}
+.st.ou{background:rgba(231,76,60,.1);color:#e74c3c;border:1px solid rgba(231,76,60,.22)}
+.st.pr{background:rgba(52,152,219,.1);color:#3498db;border:1px solid rgba(52,152,219,.22)}
+.pr{font-size:13px;font-weight:700;color:#c9a84c}
+.ca{display:flex;gap:6px;margin-top:auto}
+.bs{background:none;border:1px solid rgba(201,168,76,.18);border-radius:4px;padding:5px 9px;color:#6b6358;font-size:11px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:4px;font-family:inherit;font-weight:500}
+.bs:hover{border-color:#c9a84c;color:#c9a84c;background:rgba(201,168,76,.06)}
+.bs.on{border-color:#c9a84c;color:#c9a84c;background:rgba(201,168,76,.1)}
+.state-box{text-align:center;padding:60px 24px;color:#6b6358}
+.state-box svg{width:40px;height:40px;margin:0 auto 16px;display:block;color:#c9a84c;opacity:.4}
+.state-box h3{font-size:15px;color:#c0b49e;margin-bottom:8px}
+.state-box p{font-size:13px}
+@keyframes rot{to{transform:rotate(360deg)}}
+.lspin{animation:rot 1.5s linear infinite}
+#toast{position:fixed;bottom:24px;right:24px;z-index:200;display:flex;flex-direction:column;gap:8px;max-width:300px;pointer-events:none}
+.ti{background:#1e1e1e;border:1px solid #c9a84c;border-radius:8px;padding:12px 16px;animation:si .3s ease;box-shadow:0 4px 20px rgba(0,0,0,.6);pointer-events:all}
+@keyframes si{from{transform:translateX(120%);opacity:0}to{transform:translateX(0);opacity:1}}
+.tt{font-size:13px;font-weight:700;color:#c9a84c;margin-bottom:3px}
+.tb{font-size:11px;color:#8a7f6e;line-height:1.4}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <div class="header-left">
+      <span class="aquila">⚙</span>
+      <div>
+        <h1>Biblioteca Imperial</h1>
+        <div class="header-sub">Warhammer 40K — Black Library Tracker</div>
+      </div>
+    </div>
+    <div class="header-btns">
+      <div id="server-pill" class="status-pill pill-err"><div class="pill-dot"></div> Servidor offline</div>
+      <button class="icon-btn" onclick="toggleSettings()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Config
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="settings-overlay" id="settings-overlay" onclick="closeOut(event)">
+  <div class="settings-panel">
+    <h2>⚙ Configurações</h2>
+    <div class="s-section">
+      <h3>⏱ Intervalos de verificação</h3>
+      <div class="field-row">
+        <div class="field"><label>Livros vigiados (min)</label><input type="number" id="cfg-w" min="1" max="60" value="2"></div>
+        <div class="field"><label>Pré-encomendas (min)</label><input type="number" id="cfg-p" min="5" max="120" value="10"></div>
+      </div>
+      <p class="hint">Livros vigiados são verificados mais frequentemente. A GW costuma lançar novidades às <strong style="color:#c9a84c">sextas-feiras de manhã</strong>.</p>
+    </div>
+    <div class="s-section">
+      <h3>📧 Email (Gmail)</h3>
+      <div class="toggle-row"><input type="checkbox" id="cfg-em"><label for="cfg-em">Ativar notificações por email</label></div>
+      <div class="field"><label>Gmail</label><input type="email" id="cfg-eu" placeholder="exemplo@gmail.com"></div>
+      <div class="field"><label>App Password <span style="color:#5a5248">(não a password normal)</span></label><input type="password" id="cfg-ep" placeholder="xxxx xxxx xxxx xxxx"></div>
+      <div class="field"><label>Enviar para</label><input type="email" id="cfg-et" placeholder="destino@email.com"></div>
+      <p class="hint">Precisa de uma <a href="https://myaccount.google.com/apppasswords" target="_blank">App Password do Google</a>. Ativa 2FA na conta Google primeiro.</p>
+    </div>
+    <div class="s-section">
+      <h3>🎮 Discord</h3>
+      <div class="toggle-row"><input type="checkbox" id="cfg-do"><label for="cfg-do">Ativar notificações Discord</label></div>
+      <div class="field"><label>Webhook URL</label><input type="text" id="cfg-dw" placeholder="https://discord.com/api/webhooks/..."></div>
+      <p class="hint">Canal Discord → Editar canal → Integrações → Webhooks → Novo Webhook → Copiar URL.</p>
+    </div>
+    <button class="btn-save" onclick="saveConfig()">💾 Guardar e aplicar</button>
+    <button class="btn-test" onclick="testNotify()">🔔 Enviar notificação de teste</button>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" id="tab-preorder" onclick="switchTab('preorder')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    Pré-encomendas
+  </button>
+  <button class="tab" id="tab-all" onclick="switchTab('all')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+    Todos os livros
+  </button>
+  <button class="tab" id="tab-watchlist" onclick="switchTab('watchlist')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+    A vigiar
+    <span class="badge" id="wb" style="display:none">0</span>
+  </button>
+</div>
+
+<div id="notif-area"></div>
+
+<div class="controls">
+  <div class="search-wrap">
+    <svg class="s-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input type="text" id="q" placeholder="Pesquisar título, série..." oninput="applyFilters()">
+  </div>
+  <select id="fl" onchange="applyFilters()"><option value="">Todos os idiomas</option></select>
+  <select id="ff" onchange="applyFilters()"><option value="">Todos os formatos</option></select>
+  <select id="fs" onchange="applyFilters()">
+    <option value="">Todos os estados</option>
+    <option value="avail">✅ Disponível</option>
+    <option value="out">❌ Esgotado</option>
+    <option value="pre">🕐 Pré-encomenda</option>
+  </select>
+  <button class="btn-f" id="bwo" onclick="toggleWatchOnly()" style="display:none">🔔 Só vigiados</button>
+  <span class="count" id="cnt"></span>
+</div>
+
+<div class="statusbar">
+  <div class="dots">
+    <div class="dot-item"><div class="dot g"></div> Disponível</div>
+    <div class="dot-item"><div class="dot r"></div> Esgotado</div>
+    <div class="dot-item"><div class="dot b"></div> Pré-encomenda</div>
+    <div class="dot-item"><div class="dot y"></div> A vigiar</div>
+  </div>
+  <div class="rbar">
+    <span id="lu" style="font-size:11px;color:#6b6358">—</span>
+    <button class="rbtn" onclick="load()">
+      <svg id="ri" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      Atualizar
+    </button>
+  </div>
+</div>
+
+<div id="content"></div>
+<div id="toast"></div>
+
+<script>
+const PROXY   = 'http://localhost:3001';
+const WH_BASE = 'https://www.warhammer.com/en-EU/';
+let books=[], tab='preorder', watchOnly=false, serverOk=false;
+let watched = new Set(JSON.parse(localStorage.getItem('wh_w')||'[]'));
+
+// Boot
+loadSettings();
+checkServer().then(()=>{ if(serverOk) syncWatched(); load(); });
+setInterval(load, 5*60*1000);
+updateBadge();
+
+async function checkServer(){
+  try{
+    const r=await fetch(PROXY+'/health',{signal:AbortSignal.timeout(3000)});
+    if(r.ok){ serverOk=true; setPill(true); return; }
+  }catch(e){}
+  serverOk=false; setPill(false);
+}
+
+function setPill(ok){
+  const p=document.getElementById('server-pill');
+  p.className='status-pill '+(ok?'pill-ok':'pill-err');
+  p.innerHTML=`<div class="pill-dot"></div> Servidor ${ok?'online':'offline'}`;
+}
+
+async function syncWatched(){
+  try{
+    const r=await fetch(PROXY+'/watched');
+    if(r.ok){
+      const d=await r.json();
+      const merged=[...new Set([...watched,...(d.watched||[])])];
+      watched=new Set(merged);
+      localStorage.setItem('wh_w',JSON.stringify([...watched]));
+    }
+    pushWatched();
+  }catch(e){}
+}
+
+async function pushWatched(){
+  if(!serverOk) return;
+  try{
+    await fetch(PROXY+'/watched',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({watched:[...watched]})});
+  }catch(e){}
+}
+
+async function load(){
+  spin(true);
+  await checkServer();
+  try{
+    if(serverOk){
+      const r=await fetch(PROXY+'/books?tab='+tab);
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      const d=await r.json();
+      books=(d.hits||[]);
+    } else {
+      const ff=tab==='preorder'?[['isPreOrder:true'],['productType:book']]:[['productType:book']];
+      const r=await fetch('https://S7GRLRQQ5E-dsn.algolia.net/1/indexes/prod-lazarus-product-en-eu/query',{
+        method:'POST',
+        headers:{'X-Algolia-Application-Id':'S7GRLRQQ5E','X-Algolia-API-Key':'a3e3370abb3c3b9f27b7f1ad35a20e17','Content-Type':'application/json'},
+        body:JSON.stringify({hitsPerPage:250,facetFilters:ff,attributesToRetrieve:['name','productCode','objectID','salePrice','language','productType','isAvailable','isPreOrder','imageUrl','url','range','format']})
+      });
+      const d=await r.json();
+      books=(d.hits||[]).map(norm);
+    }
+    buildFilters(); updateTs(); applyFilters();
+    const e=document.querySelector('.err-box'); if(e) e.remove();
+  }catch(e){ showErr(e.message); }
+  finally{ spin(false); }
+}
+
+function norm(h){
+  return {
+    id:h.productCode||h.objectID, title:h.name||'—',
+    price:h.salePrice!=null?'€'+parseFloat(h.salePrice).toFixed(2):'—',
+    lang:h.language||'en', type:h.productType||'book', format:h.format||null,
+    avail:h.isAvailable===true||h.isAvailable==='true',
+    preorder:h.isPreOrder===true||h.isPreOrder==='true',
+    image:h.imageUrl||null, url:h.url||null, range:h.range||null
+  };
+}
+
+function applyFilters(){
+  const q=document.getElementById('q').value.toLowerCase();
+  const lang=document.getElementById('fl').value;
+  const fmt=document.getElementById('ff').value;
+  const st=document.getElementById('fs').value;
+  const filtered=books.filter(b=>{
+    if(tab==='preorder'&&!b.preorder) return false;
+    if(tab==='watchlist'&&!watched.has(b.id)) return false;
+    if(watchOnly&&!watched.has(b.id)) return false;
+    if(q&&!b.title.toLowerCase().includes(q)&&!(b.range||'').toLowerCase().includes(q)) return false;
+    if(lang&&b.lang!==lang) return false;
+    if(fmt&&b.format!==fmt) return false;
+    if(st==='avail'&&!b.avail) return false;
+    if(st==='out'&&(b.avail||b.preorder)) return false;
+    if(st==='pre'&&!b.preorder) return false;
+    return true;
+  });
+  document.getElementById('cnt').textContent=filtered.length+' livro'+(filtered.length!==1?'s':'');
+  render(filtered);
+}
+
+function buildFilters(){
+  const ln={en:'🇬🇧 Inglês',de:'🇩🇪 Alemão',fr:'🇫🇷 Francês',es:'🇪🇸 Espanhol',it:'🇮🇹 Italiano',pl:'🇵🇱 Polaco',pt:'🇵🇹 Português'};
+  const langs=[...new Set(books.map(b=>b.lang).filter(Boolean))].sort();
+  const fmts=[...new Set(books.map(b=>b.format).filter(Boolean))].sort();
+  const lsel=document.getElementById('fl'); const cl=lsel.value;
+  lsel.innerHTML='<option value="">Todos os idiomas</option>'+langs.map(l=>`<option value="${l}"${l===cl?' selected':''}>${ln[l]||l.toUpperCase()}</option>`).join('');
+  const fsel=document.getElementById('ff'); const cf=fsel.value;
+  fsel.innerHTML='<option value="">Todos os formatos</option>'+fmts.map(f=>`<option value="${f}"${f===cf?' selected':''}>${f}</option>`).join('');
+}
+
+function render(list){
+  const el=document.getElementById('content');
+  if(!list.length){
+    el.innerHTML=`<div class="state-box">
+      <svg class="${books.length===0?'lspin':''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        ${books.length===0?'<polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>':'<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>'}
+      </svg>
+      <h3>${books.length===0?'A carregar...':'Nenhum livro encontrado'}</h3>
+      <p>${books.length===0?'A contactar a API da Warhammer':'Tenta ajustar os filtros'}</p>
+    </div>`;
+    return;
+  }
+  el.innerHTML='<div class="grid">'+list.map(b=>{
+    const isW=watched.has(b.id);
+    const sc=b.preorder?'pr':(b.avail?'av':'ou');
+    const sl=b.preorder?'🕐 Pré-encomenda':(b.avail?'✅ Disponível':'❌ Esgotado');
+    const url=b.url?(b.url.startsWith('http')?b.url:WH_BASE+b.url):null;
+    const img=b.image?`<img class="ci" src="${b.image}" alt="" loading="lazy" onerror="this.outerHTML='<div class=cp>📚</div>'">`:`<div class="cp">📚</div>`;
+    return `<div class="card${isW?' w':''}">
+      ${isW?'<span class="wb">🔔 A vigiar</span>':''}
+      ${img}
+      <div class="cb">
+        <div class="ct" title="${b.title}">${b.title}</div>
+        <div class="cm">
+          ${b.range?`<span class="mt">${b.range}</span>`:''}
+          ${b.format?`<span class="mt">${b.format}</span>`:''}
+          <span class="mt">${b.lang.toUpperCase()}</span>
+        </div>
+        <div class="cf">
+          <span class="st ${sc}">${sl}</span>
+          <span class="pr">${b.price}</span>
+        </div>
+        <div class="ca">
+          <button class="bs${isW?' on':''}" onclick="toggleWatch('${b.id}')">
+            ${isW?'🔔 A vigiar':'🔕 Vigiar'}
+          </button>
+          ${url?`<button class="bs" onclick="window.open('${url}','_blank')">🔗 Loja</button>`:''}
+        </div>
+      </div>
+    </div>`;
+  }).join('')+'</div>';
+}
+
+async function toggleWatch(id){
+  watched.has(id)?watched.delete(id):watched.add(id);
+  localStorage.setItem('wh_w',JSON.stringify([...watched]));
+  updateBadge(); applyFilters(); await pushWatched();
+}
+
+function toggleWatchOnly(){ watchOnly=!watchOnly; document.getElementById('bwo').classList.toggle('on',watchOnly); applyFilters(); }
+function updateBadge(){ const n=watched.size; const b=document.getElementById('wb'); b.textContent=n; b.style.display=n>0?'inline-flex':'none'; document.getElementById('bwo').style.display=n>0?'flex':'none'; }
+function switchTab(t){ tab=t; watchOnly=false; books=[]; document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active')); document.getElementById('tab-'+t).classList.add('active'); document.getElementById('bwo').classList.remove('on'); load(); }
+function updateTs(){ document.getElementById('lu').textContent='Atualizado às '+new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}); }
+function spin(on){ document.getElementById('ri').classList.toggle('spin',on); }
+function showErr(m){ document.getElementById('content').innerHTML=`<div class="err-box" style="background:rgba(139,26,26,.12);border:1px solid rgba(192,57,43,.3);border-radius:6px;padding:16px 20px;margin:16px 24px;font-size:13px"><h4 style="color:#c0392b;margin-bottom:8px">⚠ Erro</h4><p style="color:#8a7f6e">${m}</p>${!serverOk?'<p style="color:#8a7f6e;margin-top:8px">Servidor offline — corre <code style="background:#111;padding:2px 6px;border-radius:3px">docker compose up -d</code></p>':''}</div>`; }
+function toast(t,b,d=4000){ const el=document.createElement('div'); el.className='ti'; el.innerHTML=`<div class="tt">${t}</div><div class="tb">${b}</div>`; document.getElementById('toast').appendChild(el); setTimeout(()=>el.remove(),d); }
+function toggleSettings(){ document.getElementById('settings-overlay').classList.toggle('open'); }
+function closeOut(e){ if(e.target===document.getElementById('settings-overlay')) document.getElementById('settings-overlay').classList.remove('open'); }
+
+function loadSettings(){
+  const s=JSON.parse(localStorage.getItem('wh_cfg')||'{}');
+  if(s.w) document.getElementById('cfg-w').value=s.w;
+  if(s.p) document.getElementById('cfg-p').value=s.p;
+  if(s.em) document.getElementById('cfg-em').checked=s.em;
+  if(s.eu) document.getElementById('cfg-eu').value=s.eu;
+  if(s.et) document.getElementById('cfg-et').value=s.et;
+  if(s.do) document.getElementById('cfg-do').checked=s.do;
+  if(s.dw) document.getElementById('cfg-dw').value=s.dw;
+}
+
+async function saveConfig(){
+  const cfg={
+    w:document.getElementById('cfg-w').value,
+    p:document.getElementById('cfg-p').value,
+    em:document.getElementById('cfg-em').checked,
+    eu:document.getElementById('cfg-eu').value,
+    ep:document.getElementById('cfg-ep').value,
+    et:document.getElementById('cfg-et').value,
+    do:document.getElementById('cfg-do').checked,
+    dw:document.getElementById('cfg-dw').value,
+  };
+  localStorage.setItem('wh_cfg',JSON.stringify(cfg));
+  if(serverOk){
+    try{ await fetch(PROXY+'/config',{method:'POST'}); toast('✅ Guardado','Servidor atualizado'); }
+    catch(e){ toast('✅ Guardado','Reinicia o Docker para aplicar'); }
+  } else { toast('✅ Guardado','Reinicia o servidor para aplicar'); }
+  document.getElementById('settings-overlay').classList.remove('open');
+}
+
+async function testNotify(){
+  if(!serverOk){ toast('❌ Servidor offline','Inicia o Docker primeiro'); return; }
+  try{
+    await fetch(PROXY+'/test-notify',{method:'POST'});
+    toast('🔔 Teste enviado','Verifica o teu email e Discord');
+  }catch(e){ toast('❌ Erro',e.message); }
+}
+</script>
+</body>
+</html>
