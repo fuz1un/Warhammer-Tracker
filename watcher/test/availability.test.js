@@ -15,6 +15,17 @@ test('detects temporarily out of stock variants', () => {
   assert.equal(state.label, 'Temporarily out of stock');
 });
 
+test('classifies preorder items with out-of-stock flags as sold out', () => {
+  const state = normalizeAvailabilityState({
+    isPreOrder: true,
+    isAvailable: true,
+    isInStock: false,
+    availability: 'Pre-order'
+  });
+  assert.equal(state.key, 'sold-out-online');
+  assert.equal(state.label, 'Sold out online');
+});
+
 test('returns distinct transition messages', () => {
   const message = getTransitionMessage(
     { key: 'available', label: 'Available' },

@@ -516,19 +516,15 @@ function setSelectionForFilter(id, values){
 function toggleFilterAll(id, checked){
   const allBox=document.getElementById(id+'-all');
   if(allBox) allBox.checked = checked;
-  setSelectionForFilter(id, checked ? [] : []);
-  updateFilterSummary(id);
-  renderFilterOptions(id, getFilterValues(id), getFilterEmptyText(id));
+  setSelectionForFilter(id, []);
+  updateFilterUi(id);
   applyFilters();
 }
 function toggleFilterSelection(id, value, checked){
   const selection=getSelectionForFilter(id);
   const next = checked ? [...selection, value].filter((v,i,a)=>a.indexOf(v)===i) : selection.filter(v=>v!==value);
   setSelectionForFilter(id, next);
-  const allBox=document.getElementById(id+'-all');
-  if(allBox) allBox.checked = next.length === 0;
-  updateFilterSummary(id);
-  renderFilterOptions(id, getFilterValues(id), getFilterEmptyText(id));
+  updateFilterUi(id);
   applyFilters();
 }
 function getFilterValues(id){
@@ -560,21 +556,32 @@ function updateFilterSummary(id){
   const preview = selection.slice(0,2).join(' • ');
   label.textContent = selection.length <= 2 ? preview : `${preview} • +${selection.length - 2}`;
 }
-function renderFilterOptions(id, values, emptyText){
+function updateFilterUi(id){
   const container=document.getElementById(id+'-options');
   if(!container) return;
   const allBox=document.getElementById(id+'-all');
   const selection=getSelectionForFilter(id);
   const allChecked=selection.length===0;
   if(allBox) allBox.checked=allChecked;
+  container.querySelectorAll('input[type="checkbox"]').forEach(box=>{
+    const value=box.getAttribute('data-value');
+    box.checked = allChecked || selection.includes(value);
+  });
+  updateFilterSummary(id);
+}
+function renderFilterOptions(id, values, emptyText){
+  const container=document.getElementById(id+'-options');
+  if(!container) return;
+  const selection=getSelectionForFilter(id);
+  const allChecked=selection.length===0;
   const options=(values||[]).length ? values.map(item=>{
     const entry = typeof item === 'string' ? { value:item, label:item } : item;
     const safe=String(entry.value).replace(/'/g,"\\'").replace(/"/g,'\\"');
     const checked=allChecked || selection.includes(entry.value);
-    return `<label class="filter-item"><input type="checkbox" value="${safe}" ${checked?'checked':''} onchange="toggleFilterSelection('${id}', '${safe}', this.checked)"> ${entry.label}</label>`;
+    return `<label class="filter-item"><input type="checkbox" data-value="${safe}" value="${safe}" ${checked?'checked':''} onchange="toggleFilterSelection('${id}', '${safe}', this.checked)"> ${entry.label}</label>`;
   }).join('') : `<div style="font-size:11px;color:#6b6358;padding:4px 0">${emptyText}</div>`;
   container.innerHTML=options;
-  updateFilterSummary(id);
+  updateFilterUi(id);
 }
 function matchesStateFilter(book, value){
   if(Array.isArray(value)) return value.some(v=>matchesStateFilter(book,v));
