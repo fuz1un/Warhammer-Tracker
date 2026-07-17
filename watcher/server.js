@@ -189,8 +189,8 @@ function normalizeAvailabilityState(h) {
   const qty = pickFirst(h.stockLevel, h.stockQuantity, h.quantityAvailable, h.inventory);
   const numericQty = qty != null && qty !== '' ? Number(qty) : null;
   const isPreOrder = truthy(h.isPreOrder) || /pre[- ]?order/i.test(rawTextValue) || truthy(h.preorder);
-  const explicitlySoldOut = /(sold out online|sold out|out of stock and is due to be removed from the webstore|not available|out of stock)/i.test(rawTextValue);
   const explicitlyTemporarilyOut = /(temporarily out of stock|temporarily unavailable|notify me|stock for this item may return|restock|due back)/i.test(rawTextValue);
+  const explicitlySoldOut = /(sold out online|sold out|out of stock and is due to be removed from the webstore|not available|out of stock)/i.test(rawTextValue) && !explicitlyTemporarilyOut;
   const explicitlyAvailable = /(in stock|available|back in stock|now available)/i.test(rawTextValue);
   const buyable = isBuyable(h) || truthy(h.isAvailable) || truthy(h.avail);
 
@@ -198,12 +198,12 @@ function normalizeAvailabilityState(h) {
     return { key: 'preorder', label: 'Pre-order', color: '#3498db', soldOut: false, available: false, message: 'Pre-order' };
   }
 
-  if (explicitlySoldOut || (numericQty !== null && numericQty <= 0)) {
-    return { key: 'sold-out-online', label: 'Sold out online', color: '#e74c3c', soldOut: true, available: false, message: 'Sold out online' };
-  }
-
   if (explicitlyTemporarilyOut || falsey(h.isInStock) || falsey(h.inStock) || falsey(h.isOrderable) || falsey(h.orderable) || falsey(h.purchasable) || falsey(h.canAddToCart) || truthy(h.addToCartDisabled)) {
     return { key: 'temporarily-out-of-stock', label: 'Temporarily out of stock', color: '#f39c12', soldOut: true, available: false, message: 'Temporarily out of stock' };
+  }
+
+  if (explicitlySoldOut || (numericQty !== null && numericQty <= 0)) {
+    return { key: 'sold-out-online', label: 'Sold out online', color: '#e74c3c', soldOut: true, available: false, message: 'Sold out online' };
   }
 
   if (explicitlyAvailable || buyable) {

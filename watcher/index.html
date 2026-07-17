@@ -191,27 +191,45 @@ select:focus{border-color:#c9a84c;outline:none}
     <svg class="s-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
     <input type="text" id="q" placeholder="Pesquisar título, série..." oninput="applyFilters()">
   </div>
-  <select id="fl" onchange="applyFilters()" size="1"><option value="">Todos os idiomas</option></select>
-  <select id="ff" onchange="applyFilters()" size="1"><option value="">Todos os formatos</option></select>
-  <div class="filter-chip" id="fr-wrap">
-    <button class="btn-f" type="button" id="fr-btn" onclick="toggleLineFilterMenu()">
-      <span id="fr-label">Todas as linhas</span>
+  <div class="filter-chip" id="fl-wrap">
+    <button class="btn-f" type="button" id="fl-btn" onclick="toggleFilterMenu('fl')">
+      <span id="fl-label">Todos os idiomas</span>
     </button>
-    <div class="filter-menu" id="fr-menu">
+    <div class="filter-menu" id="fl-menu">
       <div class="filter-menu-header">
-        <strong style="color:#c9a84c;font-size:12px">Linhas</strong>
-        <button class="link-btn" type="button" onclick="clearLineSelection()">Limpar</button>
+        <strong style="color:#c9a84c;font-size:12px">Idiomas</strong>
+        <button class="link-btn" type="button" onclick="clearFilterSelection('lang')">Limpar</button>
       </div>
-      <label class="filter-item"><input type="checkbox" id="fr-all" checked onchange="toggleAllLineFilters(this.checked)"> Todas as linhas</label>
-      <div id="fr-options"></div>
+      <label class="filter-item"><input type="checkbox" id="fl-all" checked onchange="toggleFilterAll('fl', this.checked)"> Todos os idiomas</label>
+      <div id="fl-options"></div>
     </div>
   </div>
-  <select id="fs" onchange="applyFilters()" size="1">
-    <option value="">Todos os estados</option>
-    <option value="avail">✅ Disponível</option>
-    <option value="out">❌ Esgotado</option>
-    <option value="pre">🕐 Pré-encomenda</option>
-  </select>
+  <div class="filter-chip" id="ff-wrap">
+    <button class="btn-f" type="button" id="ff-btn" onclick="toggleFilterMenu('ff')">
+      <span id="ff-label">Todos os formatos</span>
+    </button>
+    <div class="filter-menu" id="ff-menu">
+      <div class="filter-menu-header">
+        <strong style="color:#c9a84c;font-size:12px">Formatos</strong>
+        <button class="link-btn" type="button" onclick="clearFilterSelection('format')">Limpar</button>
+      </div>
+      <label class="filter-item"><input type="checkbox" id="ff-all" checked onchange="toggleFilterAll('ff', this.checked)"> Todos os formatos</label>
+      <div id="ff-options"></div>
+    </div>
+  </div>
+  <div class="filter-chip" id="fs-wrap">
+    <button class="btn-f" type="button" id="fs-btn" onclick="toggleFilterMenu('fs')">
+      <span id="fs-label">Todos os estados</span>
+    </button>
+    <div class="filter-menu" id="fs-menu">
+      <div class="filter-menu-header">
+        <strong style="color:#c9a84c;font-size:12px">Estados</strong>
+        <button class="link-btn" type="button" onclick="clearFilterSelection('state')">Limpar</button>
+      </div>
+      <label class="filter-item"><input type="checkbox" id="fs-all" checked onchange="toggleFilterAll('fs', this.checked)"> Todos os estados</label>
+      <div id="fs-options"></div>
+    </div>
+  </div>
   <button class="btn-f" id="bwo" onclick="toggleWatchOnly()" style="display:none">🔔 Só vigiados</button>
   <span class="count" id="cnt"></span>
 </div>
@@ -243,7 +261,9 @@ const BOOK_ATTRIBUTES = ['name','title','productCode','objectID','salePrice','pr
 let books=[], tab='preorder', watchOnly=false, serverOk=false;
 let watched = new Set(JSON.parse(localStorage.getItem('wh_w')||'[]'));
 let watchedBookDetails = [];
-let selectedLines = [];
+let selectedLangs=[];
+let selectedFormats=[];
+let selectedStates=[];
 
 // Boot
 loadSettings();
@@ -256,9 +276,11 @@ document.addEventListener('visibilitychange', ()=>{
   if (!document.hidden) load();
 });
 document.addEventListener('click', (event)=>{
-  const menu=document.getElementById('fr-menu');
-  const wrap=document.getElementById('fr-wrap');
-  if(menu && wrap && !wrap.contains(event.target)) toggleLineFilterMenu(false);
+  ['fl','ff','fs'].forEach(id=>{
+    const menu=document.getElementById(id+'-menu');
+    const wrap=document.getElementById(id+'-wrap');
+    if(menu && wrap && !wrap.contains(event.target)) toggleFilterMenu(id,false);
+  });
 });
 updateBadge();
 
@@ -419,8 +441,8 @@ function norm(h){
   const rawTextValue=String(rawText(raw)).trim().toLowerCase();
   let availabilityState = h.availabilityState || 'unknown';
   if (preorder) availabilityState='preorder';
-  else if (/sold out|out of stock|not available|unavailable/.test(rawTextValue)) availabilityState='sold-out-online';
   else if (/temporarily out of stock|temporarily unavailable|notify me|restock|due back/.test(rawTextValue)) availabilityState='temporarily-out-of-stock';
+  else if (/sold out|out of stock|not available|unavailable/.test(rawTextValue)) availabilityState='sold-out-online';
   else if (h.avail === true || h.isAvailable === true || h.isInStock === true || h.inStock === true || h.orderable === true || h.purchasable === true || h.canAddToCart === true) availabilityState='available';
   else if (h.avail === false || sold) availabilityState='sold-out-online';
   else availabilityState='available';
@@ -475,89 +497,95 @@ async function loadDirect(currentTab){
   return all;
 }
 
-function getSelectedValue(selectId){
-  const select=document.getElementById(selectId);
-  if(!select) return '';
-  return select.value;
-}
-function toggleLineFilterMenu(force){
-  const menu=document.getElementById('fr-menu');
+function toggleFilterMenu(id, force){
+  const menu=document.getElementById(id+'-menu');
   if(!menu) return;
   const next = force===undefined ? menu.style.display!=='block' : force;
   menu.style.display=next?'block':'none';
 }
-function toggleAllLineFilters(checked){
-  const opts=document.getElementById('fr-options');
+function getSelectionForFilter(id){
+  if(id==='fl') return selectedLangs;
+  if(id==='ff') return selectedFormats;
+  return selectedStates;
+}
+function setSelectionForFilter(id, values){
+  if(id==='fl') selectedLangs=values;
+  else if(id==='ff') selectedFormats=values;
+  else selectedStates=values;
+}
+function toggleFilterAll(id, checked){
+  const opts=document.getElementById(id+'-options');
   if(opts){
-    const boxes=opts.querySelectorAll('input[type="checkbox"]');
-    boxes.forEach(box=>{ box.checked = checked; });
+    opts.querySelectorAll('input[type="checkbox"]').forEach(box=>{ box.checked = checked; });
   }
-  selectedLines = checked ? [] : [];
-  const allBox=document.getElementById('fr-all');
+  const allBox=document.getElementById(id+'-all');
   if(allBox) allBox.checked = true;
-  updateLineFilterSummary();
+  setSelectionForFilter(id, []);
+  updateFilterSummary(id);
   applyFilters();
 }
-function toggleLineSelection(line, checked){
-  const allBox=document.getElementById('fr-all');
-  const next = checked ? [...selectedLines, line].filter((value,index,array)=>array.indexOf(value)===index) : selectedLines.filter(value=>value!==line);
-  selectedLines = next;
-  if(allBox) allBox.checked = selectedLines.length === 0;
-  updateLineFilterSummary();
+function toggleFilterSelection(id, value, checked){
+  const selection=getSelectionForFilter(id);
+  const next = checked ? [...selection, value].filter((v,i,a)=>a.indexOf(v)===i) : selection.filter(v=>v!==value);
+  setSelectionForFilter(id, next);
+  const allBox=document.getElementById(id+'-all');
+  if(allBox) allBox.checked = next.length === 0;
+  updateFilterSummary(id);
   applyFilters();
 }
-function clearLineSelection(){
-  selectedLines=[];
-  const allBox=document.getElementById('fr-all');
-  if(allBox) allBox.checked=true;
-  updateLineFilterSummary();
+function clearFilterSelection(kind){
+  if(kind==='lang') selectedLangs=[];
+  else if(kind==='format') selectedFormats=[];
+  else selectedStates=[];
+  updateFilterSummary(kind==='lang'?'fl':kind==='format'?'ff':'fs');
   applyFilters();
 }
-function updateLineFilterSummary(){
-  const label=document.getElementById('fr-label');
+function updateFilterSummary(id){
+  const label=document.getElementById(id+'-label');
   if(!label) return;
-  if(!selectedLines.length){
-    label.textContent='Todas as linhas';
+  const selection=getSelectionForFilter(id);
+  if(!selection.length){
+    label.textContent = id==='fl' ? 'Todos os idiomas' : (id==='ff' ? 'Todos os formatos' : 'Todos os estados');
     return;
   }
-  const preview = selectedLines.slice(0, 2).join(' • ');
-  label.textContent = selectedLines.length <= 2 ? preview : `${preview} • +${selectedLines.length - 2}`;
+  const preview = selection.slice(0,2).join(' • ');
+  label.textContent = selection.length <= 2 ? preview : `${preview} • +${selection.length - 2}`;
 }
-function renderLineFilterOptions(ranges){
-  const container=document.getElementById('fr-options');
+function renderFilterOptions(id, values, emptyText){
+  const container=document.getElementById(id+'-options');
   if(!container) return;
-  const allBox=document.getElementById('fr-all');
-  const allChecked=selectedLines.length===0;
+  const allBox=document.getElementById(id+'-all');
+  const selection=getSelectionForFilter(id);
+  const allChecked=selection.length===0;
   if(allBox) allBox.checked=allChecked;
-  const options=(ranges||[]).length ? (ranges||[]).map(value=>{
-    const safe=String(value).replace(/'/g,"\\'").replace(/"/g,'\\"');
-    const checked=allChecked || selectedLines.includes(value);
-    return `<label class="filter-item"><input type="checkbox" value="${safe}" ${checked?'checked':''} onchange="toggleLineSelection('${safe}', this.checked)"> ${value}</label>`;
-  }).join('') : '<div style="font-size:11px;color:#6b6358;padding:4px 0">Nenhuma linha disponível</div>';
+  const options=(values||[]).length ? values.map(item=>{
+    const entry = typeof item === 'string' ? { value:item, label:item } : item;
+    const safe=String(entry.value).replace(/'/g,"\\'").replace(/"/g,'\\"');
+    const checked=allChecked || selection.includes(entry.value);
+    return `<label class="filter-item"><input type="checkbox" value="${safe}" ${checked?'checked':''} onchange="toggleFilterSelection('${id}', '${safe}', this.checked)"> ${entry.label}</label>`;
+  }).join('') : `<div style="font-size:11px;color:#6b6358;padding:4px 0">${emptyText}</div>`;
   container.innerHTML=options;
-  updateLineFilterSummary();
+  updateFilterSummary(id);
 }
 function matchesStateFilter(book, value){
+  if(Array.isArray(value)) return value.some(v=>matchesStateFilter(book,v));
   if(value==='avail') return Boolean(book.avail && !book.preorder);
-  if(value==='out') return Boolean(!book.avail && (book.availabilityState==='sold-out-online' || book.availabilityState==='temporarily-out-of-stock' || book.soldOut));
+  if(value==='out') return Boolean(book.availabilityState==='sold-out-online' || (!book.availabilityState || book.availabilityState==='unknown' ? book.soldOut : false));
+  if(value==='temp') return Boolean(book.availabilityState==='temporarily-out-of-stock');
   if(value==='pre') return Boolean(book.preorder);
   return true;
 }
 
 function applyFilters(){
   const q=document.getElementById('q').value.toLowerCase();
-  const lang=getSelectedValue('fl');
-  const fmt=getSelectedValue('ff');
-  const state=getSelectedValue('fs');
   const filtered=books.filter(b=>{
     if(tab==='preorder'&&!b.preorder) return false;
     if(tab==='watchlist'&&!watched.has(b.id)) return false;
     if(watchOnly&&!watched.has(b.id)) return false;
     if(q&&!b.title.toLowerCase().includes(q)&&!(b.range||'').toLowerCase().includes(q)) return false;
-    if(lang && b.lang!==lang) return false;
-    if(fmt && b.format!==fmt) return false;
-    if(selectedLines.length && !selectedLines.includes(b.range)) return false;
-    if(state && !matchesStateFilter(b,state)) return false;
+    if(selectedLangs.length && !selectedLangs.includes(b.lang)) return false;
+    if(selectedFormats.length && !selectedFormats.includes(b.format)) return false;
+    if(selectedStates.length && !selectedStates.some(state=>matchesStateFilter(b,state))) return false;
     return true;
   });
   document.getElementById('cnt').textContent=filtered.length+' livro'+(filtered.length!==1?'s':'');
@@ -566,19 +594,12 @@ function applyFilters(){
 
 function buildFilters(){
   const ln={en:'🇬🇧 Inglês',de:'🇩🇪 Alemão',fr:'🇫🇷 Francês',es:'🇪🇸 Espanhol',it:'🇮🇹 Italiano',pl:'🇵🇱 Polaco',pt:'🇵🇹 Português'};
-  const prevLang=getSelectedValue('fl');
-  const prevFmt=getSelectedValue('ff');
-  const prevState=getSelectedValue('fs');
-  const langs=[...new Set(books.map(b=>b.lang).filter(Boolean))].sort();
-  const fmts=[...new Map(books.filter(b=>b.format).map(b=>[b.format,b.formatLabel||b.format])).entries()].sort((a,b)=>a[1].localeCompare(b[1]));
-  const ranges=[...new Set(books.map(b=>b.range).filter(Boolean))].sort();
-  const lsel=document.getElementById('fl');
-  lsel.innerHTML='<option value="">Todos os idiomas</option>'+langs.map(l=>`<option value="${l}"${prevLang===l?' selected':''}>${ln[l]||l.toUpperCase()}</option>`).join('');
-  const fsel=document.getElementById('ff');
-  fsel.innerHTML='<option value="">Todos os formatos</option>'+fmts.map(([value,label])=>`<option value="${value}"${prevFmt===value?' selected':''}>${label}</option>`).join('');
-  renderLineFilterOptions(ranges);
-  const ssel=document.getElementById('fs');
-  ssel.innerHTML='<option value="">Todos os estados</option><option value="avail"'+(prevState==='avail'?' selected':'')+'>✅ Disponível</option><option value="out"'+(prevState==='out'?' selected':'')+'>❌ Esgotado</option><option value="pre"'+(prevState==='pre'?' selected':'')+'>🕐 Pré-encomenda</option>';
+  const langs=[...new Set(books.map(b=>b.lang).filter(Boolean))].sort().map(value=>({value,label:ln[value]||value.toUpperCase()}));
+  const fmts=[...new Map(books.filter(b=>b.format).map(b=>[b.format,b.formatLabel||b.format])).entries()].sort((a,b)=>a[1].localeCompare(b[1])).map(([value,label])=>({value,label}));
+  const states=[{value:'avail',label:'✅ Disponível'},{value:'out',label:'❌ Sold out online'},{value:'temp',label:'⚠️ Temporarily out of stock'},{value:'pre',label:'🕐 Pré-encomenda'}];
+  renderFilterOptions('fl', langs, 'Nenhum idioma disponível');
+  renderFilterOptions('ff', fmts, 'Nenhum formato disponível');
+  renderFilterOptions('fs', states, 'Nenhum estado disponível');
 }
 
 function pruneWatchedBooks(){
