@@ -515,10 +515,10 @@ function setSelectionForFilter(id, values){
 }
 function toggleFilterAll(id, checked){
   const allBox=document.getElementById(id+'-all');
-  if(allBox) allBox.checked = true;
-  setSelectionForFilter(id, []);
+  if(allBox) allBox.checked = checked;
+  setSelectionForFilter(id, checked ? [] : []);
   updateFilterSummary(id);
-  buildFilters();
+  renderFilterOptions(id, getFilterValues(id), getFilterEmptyText(id));
   applyFilters();
 }
 function toggleFilterSelection(id, value, checked){
@@ -528,8 +528,18 @@ function toggleFilterSelection(id, value, checked){
   const allBox=document.getElementById(id+'-all');
   if(allBox) allBox.checked = next.length === 0;
   updateFilterSummary(id);
-  buildFilters();
+  renderFilterOptions(id, getFilterValues(id), getFilterEmptyText(id));
   applyFilters();
+}
+function getFilterValues(id){
+  if(id==='fl') return [...new Set(books.map(b=>b.lang).filter(Boolean))].sort().map(value=>({value,label:{en:'🇬🇧 Inglês',de:'🇩🇪 Alemão',fr:'🇫🇷 Francês',es:'🇪🇸 Espanhol',it:'🇮🇹 Italiano',pl:'🇵🇱 Polaco',pt:'🇵🇹 Português'}[value]||value.toUpperCase()}));
+  if(id==='ff') return [...new Map(books.filter(b=>b.format).map(b=>[b.format,b.formatLabel||b.format])).entries()].sort((a,b)=>a[1].localeCompare(b[1])).map(([value,label])=>({value,label}));
+  return [{value:'avail',label:'✅ Disponível'},{value:'out',label:'❌ Sold out online'},{value:'temp',label:'⚠️ Temporarily out of stock'},{value:'pre',label:'🕐 Pré-encomenda'}];
+}
+function getFilterEmptyText(id){
+  if(id==='fl') return 'Nenhum idioma disponível';
+  if(id==='ff') return 'Nenhum formato disponível';
+  return 'Nenhum estado disponível';
 }
 function clearFilterSelection(kind){
   if(kind==='lang') selectedLangs=[];
@@ -592,13 +602,9 @@ function applyFilters(){
 }
 
 function buildFilters(){
-  const ln={en:'🇬🇧 Inglês',de:'🇩🇪 Alemão',fr:'🇫🇷 Francês',es:'🇪🇸 Espanhol',it:'🇮🇹 Italiano',pl:'🇵🇱 Polaco',pt:'🇵🇹 Português'};
-  const langs=[...new Set(books.map(b=>b.lang).filter(Boolean))].sort().map(value=>({value,label:ln[value]||value.toUpperCase()}));
-  const fmts=[...new Map(books.filter(b=>b.format).map(b=>[b.format,b.formatLabel||b.format])).entries()].sort((a,b)=>a[1].localeCompare(b[1])).map(([value,label])=>({value,label}));
-  const states=[{value:'avail',label:'✅ Disponível'},{value:'out',label:'❌ Sold out online'},{value:'temp',label:'⚠️ Temporarily out of stock'},{value:'pre',label:'🕐 Pré-encomenda'}];
-  renderFilterOptions('fl', langs, 'Nenhum idioma disponível');
-  renderFilterOptions('ff', fmts, 'Nenhum formato disponível');
-  renderFilterOptions('fs', states, 'Nenhum estado disponível');
+  renderFilterOptions('fl', getFilterValues('fl'), 'Nenhum idioma disponível');
+  renderFilterOptions('ff', getFilterValues('ff'), 'Nenhum formato disponível');
+  renderFilterOptions('fs', getFilterValues('fs'), 'Nenhum estado disponível');
 }
 
 function pruneWatchedBooks(){

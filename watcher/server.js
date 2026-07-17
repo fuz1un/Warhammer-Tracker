@@ -194,6 +194,10 @@ function normalizeAvailabilityState(h) {
   const explicitlyAvailable = /(in stock|available|back in stock|now available)/i.test(rawTextValue);
   const buyable = isBuyable(h) || truthy(h.isAvailable) || truthy(h.avail);
 
+  if (isPreOrder && (explicitlyAvailable || buyable || explicitStringMatchesPreorder(rawTextValue))) {
+    return { key: 'preorder', label: 'Pre-order', color: '#3498db', soldOut: false, available: false, message: 'Pre-order' };
+  }
+
   if (explicitlyTemporarilyOut || falsey(h.isInStock) || falsey(h.inStock) || falsey(h.isOrderable) || falsey(h.orderable) || falsey(h.purchasable) || falsey(h.canAddToCart) || truthy(h.addToCartDisabled)) {
     return { key: 'temporarily-out-of-stock', label: 'Temporarily out of stock', color: '#f39c12', soldOut: true, available: false, message: 'Temporarily out of stock' };
   }
@@ -211,6 +215,10 @@ function normalizeAvailabilityState(h) {
   }
 
   return { key: 'unknown', label: 'Unknown', color: '#8a7f6e', soldOut: false, available: false, message: 'Unknown' };
+}
+
+function explicitStringMatchesPreorder(rawTextValue) {
+  return /pre[- ]?order/i.test(rawTextValue) || /available for preorder/i.test(rawTextValue);
 }
 
 function getTransitionMessage(prevState, currState) {
