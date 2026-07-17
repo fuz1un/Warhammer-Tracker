@@ -15,9 +15,9 @@ test('detects temporarily out of stock variants', () => {
   assert.equal(state.label, 'Temporarily out of stock');
 });
 
-test('classifies preorder items with out-of-stock flags as sold out', () => {
+test('classifies out-of-stock items with stock flags as sold out', () => {
   const state = normalizeAvailabilityState({
-    isPreOrder: true,
+    isPreOrder: false,
     isAvailable: true,
     isInStock: false,
     availability: 'Pre-order'

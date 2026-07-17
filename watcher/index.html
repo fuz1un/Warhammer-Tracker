@@ -541,8 +541,9 @@ function clearFilterSelection(kind){
   if(kind==='lang') selectedLangs=[];
   else if(kind==='format') selectedFormats=[];
   else selectedStates=[];
-  updateFilterSummary(kind==='lang'?'fl':kind==='format'?'ff':'fs');
-  buildFilters();
+  const id = kind==='lang' ? 'fl' : (kind==='format' ? 'ff' : 'fs');
+  updateFilterSummary(id);
+  updateFilterUi(id);
   applyFilters();
 }
 function updateFilterSummary(id){
@@ -565,7 +566,11 @@ function updateFilterUi(id){
   if(allBox) allBox.checked=allChecked;
   container.querySelectorAll('input[type="checkbox"]').forEach(box=>{
     const value=box.getAttribute('data-value');
-    box.checked = allChecked || selection.includes(value);
+    if(value===null){
+      box.checked = allChecked;
+      return;
+    }
+    box.checked = selection.includes(value);
   });
   updateFilterSummary(id);
 }
@@ -573,11 +578,10 @@ function renderFilterOptions(id, values, emptyText){
   const container=document.getElementById(id+'-options');
   if(!container) return;
   const selection=getSelectionForFilter(id);
-  const allChecked=selection.length===0;
   const options=(values||[]).length ? values.map(item=>{
     const entry = typeof item === 'string' ? { value:item, label:item } : item;
     const safe=String(entry.value).replace(/'/g,"\\'").replace(/"/g,'\\"');
-    const checked=allChecked || selection.includes(entry.value);
+    const checked=selection.includes(entry.value);
     return `<label class="filter-item"><input type="checkbox" data-value="${safe}" value="${safe}" ${checked?'checked':''} onchange="toggleFilterSelection('${id}', '${safe}', this.checked)"> ${entry.label}</label>`;
   }).join('') : `<div style="font-size:11px;color:#6b6358;padding:4px 0">${emptyText}</div>`;
   container.innerHTML=options;
