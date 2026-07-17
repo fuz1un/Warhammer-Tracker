@@ -333,7 +333,10 @@ function falsey(v){
 function soldOut(h){
   const s=pickFirst(h.availability,h.availabilityStatus,h.productStatus,h.stockStatus,h.onlineStockStatus,h.stock_status);
   const qty=pickFirst(h.stockLevel,h.stockQuantity,h.quantityAvailable,h.inventory);
-  if(s!=null&&falsey(s)) return true;
+  const raw=String(rawText(s)).trim().toLowerCase();
+  if(raw.includes('pre-order')||raw.includes('preorder')) return false;
+  if(/sold out|out of stock|not available|unavailable/.test(raw)) return true;
+  if(/temporarily out of stock|temporarily unavailable|notify me|restock|due back/.test(raw)) return true;
   if(qty!==undefined&&qty!==null&&qty!==''&&Number(qty)<=0) return true;
   if(falsey(h.isInStock)||falsey(h.inStock)||falsey(h.isOrderable)||falsey(h.orderable)||falsey(h.purchasable)||falsey(h.canAddToCart)) return true;
   if(truthy(h.addToCartDisabled)) return true;
@@ -412,13 +415,22 @@ function norm(h){
   const lang=langKey(h.lang||h.language,title,url);
   const preorder=truthy(h.isPreOrder) || h.preorder;
   const sold=soldOut(h);
-  const availabilityState = h.availabilityState || (preorder ? 'preorder' : (!h.avail && sold ? 'sold-out-online' : (!h.avail ? 'temporarily-out-of-stock' : 'available')));
+  const raw=pickFirst(h.availability,h.availabilityStatus,h.productStatus,h.stockStatus,h.onlineStockStatus,h.stock_status);
+  const rawTextValue=String(rawText(raw)).trim().toLowerCase();
+  let availabilityState = h.availabilityState || 'unknown';
+  if (preorder) availabilityState='preorder';
+  else if (/sold out|out of stock|not available|unavailable/.test(rawTextValue)) availabilityState='sold-out-online';
+  else if (/temporarily out of stock|temporarily unavailable|notify me|restock|due back/.test(rawTextValue)) availabilityState='temporarily-out-of-stock';
+  else if (h.avail === true || h.isAvailable === true || h.isInStock === true || h.inStock === true || h.orderable === true || h.purchasable === true || h.canAddToCart === true) availabilityState='available';
+  else if (h.avail === false || sold) availabilityState='sold-out-online';
+  else availabilityState='available';
+
   if(h.avail!==undefined&&h.title!==undefined){
     const hasStockFields=['isAvailable','isInStock','inStock','stockLevel','stockQuantity','quantityAvailable','inventory','isOrderable','orderable','purchasable','canAddToCart','addToCartDisabled','availability','availabilityStatus','productStatus','stockStatus','onlineStockStatus','stock_status'].some(k=>h[k]!==undefined);
     const avail=hasStockFields?!sold&&buyable(h):h.avail;
     return {...h,title,url,format,formatLabel:formatLabel(format,h.format),lang:lang||h.lang||'',avail,preorder,availabilityState,soldOut:sold};
   }
-  const available=!sold&&buyable(h);
+  const available=availabilityState==='available';
   const rawPrice=pickFirst(h.salePrice,h.price);
   return {
     id:h.productCode||h.objectID, title,
@@ -475,14 +487,14 @@ function toggleLineFilterMenu(force){
   menu.style.display=next?'block':'none';
 }
 function toggleAllLineFilters(checked){
-  selectedLines = [];
   const opts=document.getElementById('fr-options');
   if(opts){
     const boxes=opts.querySelectorAll('input[type="checkbox"]');
     boxes.forEach(box=>{ box.checked = checked; });
   }
+  selectedLines = checked ? [] : [];
   const allBox=document.getElementById('fr-all');
-  if(allBox) allBox.checked = checked;
+  if(allBox) allBox.checked = true;
   updateLineFilterSummary();
   applyFilters();
 }
@@ -508,7 +520,8 @@ function updateLineFilterSummary(){
     label.textContent='Todas as linhas';
     return;
   }
-  label.textContent=selectedLines.length===1 ? selectedLines[0] : `${selectedLines.length} linhas`;
+  const preview = selectedLines.slice(0, 2).join(' • ');
+  label.textContent = selectedLines.length <= 2 ? preview : `${preview} • +${selectedLines.length - 2}`;
 }
 function renderLineFilterOptions(ranges){
   const container=document.getElementById('fr-options');
@@ -516,11 +529,12 @@ function renderLineFilterOptions(ranges){
   const allBox=document.getElementById('fr-all');
   const allChecked=selectedLines.length===0;
   if(allBox) allBox.checked=allChecked;
-  container.innerHTML=(ranges||[]).map(value=>{
+  const options=(ranges||[]).length ? (ranges||[]).map(value=>{
     const safe=String(value).replace(/'/g,"\\'").replace(/"/g,'\\"');
     const checked=allChecked || selectedLines.includes(value);
     return `<label class="filter-item"><input type="checkbox" value="${safe}" ${checked?'checked':''} onchange="toggleLineSelection('${safe}', this.checked)"> ${value}</label>`;
-  }).join('');
+  }).join('') : '<div style="font-size:11px;color:#6b6358;padding:4px 0">Nenhuma linha disponível</div>';
+  container.innerHTML=options;
   updateLineFilterSummary();
 }
 function matchesStateFilter(book, value){
