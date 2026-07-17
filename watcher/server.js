@@ -621,7 +621,7 @@ const server = http.createServer(async (req, res) => {
 
   if (url.pathname === '/watched') {
     if (req.method === 'GET') {
-      return json(res, 200, { watched: state.watched, lastStatus: state.lastStatus });
+      return json(res, 200, { watched: state.watched, lastStatus: state.lastStatus, lastSeen: state.lastSeen });
     }
     if (req.method === 'POST') {
       try {

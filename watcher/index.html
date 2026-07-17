@@ -9,6 +9,12 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#111;color:#e8dcc8;font-family:'Inter',system-ui,sans-serif;min-height:100vh}
 .header{background:linear-gradient(180deg,#0a0a0a 0%,#1a0800 60%,#0a0a0a 100%);border-bottom:1px solid #c9a84c;padding:18px 24px 14px;position:relative;overflow:hidden}
+.filter-chip{position:relative;min-width:150px}
+.filter-menu{position:absolute;top:calc(100% + 6px);left:0;z-index:50;min-width:240px;background:#1a1a1a;border:1px solid rgba(201,168,76,.24);border-radius:8px;padding:10px 10px 8px;box-shadow:0 10px 24px rgba(0,0,0,.35);display:none}
+.filter-menu-header{display:flex;align-items:center;justify-content:space-between;padding-bottom:8px;margin-bottom:8px;border-bottom:1px solid rgba(201,168,76,.12)}
+.filter-item{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;color:#c0b49e;cursor:pointer}
+.filter-item input{accent-color:#c9a84c}
+.link-btn{background:none;border:none;padding:0;color:#c9a84c;font-size:11px;cursor:pointer;font-family:inherit}
 .header::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M40 8L46 28H66L50 40L57 60L40 48L23 60L30 40L14 28H34Z' fill='none' stroke='rgba(201,168,76,0.035)' stroke-width='1'/%3E%3C/svg%3E") repeat;pointer-events:none}
 .header-inner{position:relative;display:flex;align-items:center;justify-content:space-between}
 .header-left{display:flex;align-items:center;gap:14px}
@@ -187,7 +193,19 @@ select:focus{border-color:#c9a84c;outline:none}
   </div>
   <select id="fl" onchange="applyFilters()" size="1"><option value="">Todos os idiomas</option></select>
   <select id="ff" onchange="applyFilters()" size="1"><option value="">Todos os formatos</option></select>
-  <select id="fr" onchange="applyFilters()" size="1"><option value="">Todas as linhas</option></select>
+  <div class="filter-chip" id="fr-wrap">
+    <button class="btn-f" type="button" id="fr-btn" onclick="toggleLineFilterMenu()">
+      <span id="fr-label">Todas as linhas</span>
+    </button>
+    <div class="filter-menu" id="fr-menu">
+      <div class="filter-menu-header">
+        <strong style="color:#c9a84c;font-size:12px">Linhas</strong>
+        <button class="link-btn" type="button" onclick="clearLineSelection()">Limpar</button>
+      </div>
+      <label class="filter-item"><input type="checkbox" id="fr-all" checked onchange="toggleAllLineFilters(this.checked)"> Todas as linhas</label>
+      <div id="fr-options"></div>
+    </div>
+  </div>
   <select id="fs" onchange="applyFilters()" size="1">
     <option value="">Todos os estados</option>
     <option value="avail">✅ Disponível</option>
@@ -224,16 +242,23 @@ const WH_BASE = 'https://www.warhammer.com/en-EU/';
 const BOOK_ATTRIBUTES = ['name','title','productCode','objectID','salePrice','price','language','productType','isAvailable','isPreOrder','isInStock','inStock','stockLevel','stockQuantity','quantityAvailable','inventory','isOrderable','orderable','purchasable','canAddToCart','addToCartDisabled','availability','availabilityStatus','productStatus','stockStatus','onlineStockStatus','imageUrl','image_url','image','images','media','url','slug','productUrl','canonicalUrl','path','range','format','bookFormat','productFormat'];
 let books=[], tab='preorder', watchOnly=false, serverOk=false;
 let watched = new Set(JSON.parse(localStorage.getItem('wh_w')||'[]'));
+let watchedBookDetails = [];
+let selectedLines = [];
 
 // Boot
 loadSettings();
-checkServer().then(()=>{ if(serverOk) syncWatched(); load(); });
+checkServer().then(async ()=>{ if(serverOk) await syncWatched(); load(); });
 setInterval(()=>{
   if (document.visibilityState === 'hidden') return;
   load();
 }, 30000);
 document.addEventListener('visibilitychange', ()=>{
   if (!document.hidden) load();
+});
+document.addEventListener('click', (event)=>{
+  const menu=document.getElementById('fr-menu');
+  const wrap=document.getElementById('fr-wrap');
+  if(menu && wrap && !wrap.contains(event.target)) toggleLineFilterMenu(false);
 });
 updateBadge();
 
@@ -258,6 +283,7 @@ async function syncWatched(){
       const d=await r.json();
       const merged=[...new Set([...watched,...(d.watched||[])])];
       watched=new Set(merged);
+      watchedBookDetails = Object.values(d.lastSeen || {}).filter(Boolean);
       localStorage.setItem('wh_w',JSON.stringify([...watched]));
     }
     pushWatched();
@@ -275,16 +301,18 @@ async function load(){
   spin(true);
   await checkServer();
   try{
+    let hits=[];
     if(serverOk){
       const r=await fetch(PROXY+'/books?tab='+tab);
       if(!r.ok) throw new Error('HTTP '+r.status);
       const d=await r.json();
-      books=(d.hits||[]);
+      hits=(d.hits||[]);
     } else {
-      books=await loadDirect(tab);
+      hits=await loadDirect(tab);
     }
-    books=dedupeBooks(books.map(norm));
-    pruneWatchedBooks(books);
+    const baseBooks = hits.map(entry => norm(entry));
+    const extraBooks = (watchedBookDetails||[]).filter(entry => watched.has(entry.id) && !baseBooks.some(book => book.id === entry.id));
+    books=dedupeBooks([...baseBooks, ...extraBooks]);
     buildFilters(); updateTs(); applyFilters();
     const e=document.querySelector('.err-box'); if(e) e.remove();
   }catch(e){ showErr(e.message); }
@@ -382,13 +410,15 @@ function norm(h){
   const url=h.url||h.slug||h.productUrl||h.canonicalUrl||h.path||null;
   const format=formatKey(h.format||h.bookFormat||h.productFormat,title,url);
   const lang=langKey(h.lang||h.language,title,url);
+  const preorder=truthy(h.isPreOrder) || h.preorder;
+  const sold=soldOut(h);
+  const availabilityState = h.availabilityState || (preorder ? 'preorder' : (!h.avail && sold ? 'sold-out-online' : (!h.avail ? 'temporarily-out-of-stock' : 'available')));
   if(h.avail!==undefined&&h.title!==undefined){
     const hasStockFields=['isAvailable','isInStock','inStock','stockLevel','stockQuantity','quantityAvailable','inventory','isOrderable','orderable','purchasable','canAddToCart','addToCartDisabled','availability','availabilityStatus','productStatus','stockStatus','onlineStockStatus','stock_status'].some(k=>h[k]!==undefined);
-    const avail=hasStockFields?!soldOut(h)&&buyable(h):h.avail;
-    return {...h,title,url,format,formatLabel:formatLabel(format,h.format),lang:lang||h.lang||'',avail};
+    const avail=hasStockFields?!sold&&buyable(h):h.avail;
+    return {...h,title,url,format,formatLabel:formatLabel(format,h.format),lang:lang||h.lang||'',avail,preorder,availabilityState,soldOut:sold};
   }
-  const preorder=truthy(h.isPreOrder);
-  const available=!soldOut(h)&&buyable(h);
+  const available=!sold&&buyable(h);
   const rawPrice=pickFirst(h.salePrice,h.price);
   return {
     id:h.productCode||h.objectID, title,
@@ -396,7 +426,11 @@ function norm(h){
     lang, type:h.productType||'book', format, formatLabel:formatLabel(format,h.format),
     avail:available,
     preorder,
-    image:imageOf(h), url, range:h.range||null
+    soldOut:sold,
+    image:imageOf(h), url, range:h.range||null,
+    availabilityState,
+    availabilityLabel: availabilityState==='sold-out-online' ? 'Sold out online' : (availabilityState==='temporarily-out-of-stock' ? 'Temporarily out of stock' : (preorder?'Pre-order':'Available')),
+    availabilityColor: availabilityState==='sold-out-online' ? '#e74c3c' : (availabilityState==='temporarily-out-of-stock' ? '#f39c12' : (preorder ? '#3498db' : '#2ecc71')),
   };
 }
 
@@ -434,10 +468,64 @@ function getSelectedValue(selectId){
   if(!select) return '';
   return select.value;
 }
-
+function toggleLineFilterMenu(force){
+  const menu=document.getElementById('fr-menu');
+  if(!menu) return;
+  const next = force===undefined ? menu.style.display!=='block' : force;
+  menu.style.display=next?'block':'none';
+}
+function toggleAllLineFilters(checked){
+  selectedLines = [];
+  const opts=document.getElementById('fr-options');
+  if(opts){
+    const boxes=opts.querySelectorAll('input[type="checkbox"]');
+    boxes.forEach(box=>{ box.checked = checked; });
+  }
+  const allBox=document.getElementById('fr-all');
+  if(allBox) allBox.checked = checked;
+  updateLineFilterSummary();
+  applyFilters();
+}
+function toggleLineSelection(line, checked){
+  const allBox=document.getElementById('fr-all');
+  const next = checked ? [...selectedLines, line].filter((value,index,array)=>array.indexOf(value)===index) : selectedLines.filter(value=>value!==line);
+  selectedLines = next;
+  if(allBox) allBox.checked = selectedLines.length === 0;
+  updateLineFilterSummary();
+  applyFilters();
+}
+function clearLineSelection(){
+  selectedLines=[];
+  const allBox=document.getElementById('fr-all');
+  if(allBox) allBox.checked=true;
+  updateLineFilterSummary();
+  applyFilters();
+}
+function updateLineFilterSummary(){
+  const label=document.getElementById('fr-label');
+  if(!label) return;
+  if(!selectedLines.length){
+    label.textContent='Todas as linhas';
+    return;
+  }
+  label.textContent=selectedLines.length===1 ? selectedLines[0] : `${selectedLines.length} linhas`;
+}
+function renderLineFilterOptions(ranges){
+  const container=document.getElementById('fr-options');
+  if(!container) return;
+  const allBox=document.getElementById('fr-all');
+  const allChecked=selectedLines.length===0;
+  if(allBox) allBox.checked=allChecked;
+  container.innerHTML=(ranges||[]).map(value=>{
+    const safe=String(value).replace(/'/g,"\\'").replace(/"/g,'\\"');
+    const checked=allChecked || selectedLines.includes(value);
+    return `<label class="filter-item"><input type="checkbox" value="${safe}" ${checked?'checked':''} onchange="toggleLineSelection('${safe}', this.checked)"> ${value}</label>`;
+  }).join('');
+  updateLineFilterSummary();
+}
 function matchesStateFilter(book, value){
   if(value==='avail') return Boolean(book.avail && !book.preorder);
-  if(value==='out') return Boolean(!book.avail && (book.availabilityState==='sold-out-online' || book.availabilityState==='temporarily-out-of-stock'));
+  if(value==='out') return Boolean(!book.avail && (book.availabilityState==='sold-out-online' || book.availabilityState==='temporarily-out-of-stock' || book.soldOut));
   if(value==='pre') return Boolean(book.preorder);
   return true;
 }
@@ -446,7 +534,6 @@ function applyFilters(){
   const q=document.getElementById('q').value.toLowerCase();
   const lang=getSelectedValue('fl');
   const fmt=getSelectedValue('ff');
-  const line=getSelectedValue('fr');
   const state=getSelectedValue('fs');
   const filtered=books.filter(b=>{
     if(tab==='preorder'&&!b.preorder) return false;
@@ -455,7 +542,7 @@ function applyFilters(){
     if(q&&!b.title.toLowerCase().includes(q)&&!(b.range||'').toLowerCase().includes(q)) return false;
     if(lang && b.lang!==lang) return false;
     if(fmt && b.format!==fmt) return false;
-    if(line && b.range!==line) return false;
+    if(selectedLines.length && !selectedLines.includes(b.range)) return false;
     if(state && !matchesStateFilter(b,state)) return false;
     return true;
   });
@@ -467,7 +554,6 @@ function buildFilters(){
   const ln={en:'🇬🇧 Inglês',de:'🇩🇪 Alemão',fr:'🇫🇷 Francês',es:'🇪🇸 Espanhol',it:'🇮🇹 Italiano',pl:'🇵🇱 Polaco',pt:'🇵🇹 Português'};
   const prevLang=getSelectedValue('fl');
   const prevFmt=getSelectedValue('ff');
-  const prevLine=getSelectedValue('fr');
   const prevState=getSelectedValue('fs');
   const langs=[...new Set(books.map(b=>b.lang).filter(Boolean))].sort();
   const fmts=[...new Map(books.filter(b=>b.format).map(b=>[b.format,b.formatLabel||b.format])).entries()].sort((a,b)=>a[1].localeCompare(b[1]));
@@ -476,20 +562,13 @@ function buildFilters(){
   lsel.innerHTML='<option value="">Todos os idiomas</option>'+langs.map(l=>`<option value="${l}"${prevLang===l?' selected':''}>${ln[l]||l.toUpperCase()}</option>`).join('');
   const fsel=document.getElementById('ff');
   fsel.innerHTML='<option value="">Todos os formatos</option>'+fmts.map(([value,label])=>`<option value="${value}"${prevFmt===value?' selected':''}>${label}</option>`).join('');
-  const rsel=document.getElementById('fr');
-  rsel.innerHTML='<option value="">Todas as linhas</option>'+ranges.map(value=>`<option value="${value}"${prevLine===value?' selected':''}>${value}</option>`).join('');
+  renderLineFilterOptions(ranges);
   const ssel=document.getElementById('fs');
   ssel.innerHTML='<option value="">Todos os estados</option><option value="avail"'+(prevState==='avail'?' selected':'')+'>✅ Disponível</option><option value="out"'+(prevState==='out'?' selected':'')+'>❌ Esgotado</option><option value="pre"'+(prevState==='pre'?' selected':'')+'>🕐 Pré-encomenda</option>';
 }
 
-function pruneWatchedBooks(currentBooks){
-  const currentIds=new Set(currentBooks.map(b=>b.id).filter(Boolean));
-  const previousSize=watched.size;
-  watched=new Set([...watched].filter(id=>currentIds.has(id)));
-  if(previousSize!==watched.size){
-    localStorage.setItem('wh_w',JSON.stringify([...watched]));
-    updateBadge();
-  }
+function pruneWatchedBooks(){
+  updateBadge();
 }
 
 function render(list){
@@ -506,10 +585,10 @@ function render(list){
   }
   el.innerHTML='<div class="grid">'+list.map(b=>{
     const isW=watched.has(b.id);
-    const stateKey=(b.availabilityState||'available');
-    const stateClass=stateKey==='available'?'av':(stateKey==='preorder'?'pr':'ou');
-    const statusLabel = stateKey==='sold-out-online' ? '❌ Sold out online' : (stateKey==='temporarily-out-of-stock' ? '⚠️ Temporarily out of stock' : (b.preorder?'🕐 Pre-order':'✅ Available'));
-    const stateColor = stateKey==='sold-out-online' ? '#e74c3c' : (stateKey==='temporarily-out-of-stock' ? '#f39c12' : (b.preorder ? '#3498db' : '#2ecc71'));
+    const stateKey=(b.availabilityState || (b.preorder ? 'preorder' : (b.avail === false ? (b.soldOut ? 'sold-out-online' : 'temporarily-out-of-stock') : 'available')));
+    const stateClass=(stateKey==='available'?'av':(stateKey==='preorder'?'pr':'ou'));
+    const statusLabel = b.availabilityLabel || (stateKey==='sold-out-online' ? '❌ Sold out online' : (stateKey==='temporarily-out-of-stock' ? '⚠️ Temporarily out of stock' : (b.preorder?'🕐 Pre-order':'✅ Available')));
+    const stateColor = b.availabilityColor || (stateKey==='sold-out-online' ? '#e74c3c' : (stateKey==='temporarily-out-of-stock' ? '#f39c12' : (b.preorder ? '#3498db' : '#2ecc71')));
     const url=shopUrl(b.url);
     const img=b.image?`<div class="imgbox"><img class="ci" src="${b.image}" alt="" loading="lazy" onerror="this.parentElement.outerHTML='<div class=cp>📚</div>'"></div>`:`<div class="cp">📚</div>`;
     return `<div class="card${isW?' w':''}">
