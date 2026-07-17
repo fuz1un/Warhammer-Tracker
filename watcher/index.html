@@ -85,7 +85,7 @@ select:focus{border-color:#c9a84c;outline:none}
 .ci{width:100%;height:100%;object-fit:contain;display:block;filter:contrast(1.04) saturate(1.04)}
 .cp{width:100%;height:160px;background:linear-gradient(135deg,#181818,#251a08);display:flex;align-items:center;justify-content:center;color:rgba(201,168,76,.1);font-size:56px}
 .cb{padding:12px;display:flex;flex-direction:column;flex:1}
-.ct{font-size:12px;font-weight:600;color:#ddd;line-height:1.4;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ct{font-size:12px;font-weight:600;color:#ddd;line-height:1.4;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .cm{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px}
 .mt{background:rgba(255,255,255,.06);border-radius:3px;padding:2px 6px;font-size:10px;color:#7a7060}
 .cf{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:8px}
@@ -185,9 +185,10 @@ select:focus{border-color:#c9a84c;outline:none}
     <svg class="s-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
     <input type="text" id="q" placeholder="Pesquisar título, série..." oninput="applyFilters()">
   </div>
-  <select id="fl" onchange="applyFilters()"><option value="">Todos os idiomas</option></select>
-  <select id="ff" onchange="applyFilters()"><option value="">Todos os formatos</option></select>
-  <select id="fs" onchange="applyFilters()">
+  <select id="fl" onchange="applyFilters()" multiple size="4"><option value="">Todos os idiomas</option></select>
+  <select id="ff" onchange="applyFilters()" multiple size="4"><option value="">Todos os formatos</option></select>
+  <select id="fr" onchange="applyFilters()" multiple size="4"><option value="">Todas as linhas</option></select>
+  <select id="fs" onchange="applyFilters()" multiple size="4">
     <option value="">Todos os estados</option>
     <option value="avail">✅ Disponível</option>
     <option value="out">❌ Esgotado</option>
@@ -213,6 +214,7 @@ select:focus{border-color:#c9a84c;outline:none}
   </div>
 </div>
 
+<div id="history-panel" style="display:none;background:#141414;border-top:1px solid rgba(201,168,76,.12);padding:12px 24px"></div>
 <div id="content"></div>
 <div id="toast"></div>
 
@@ -276,6 +278,7 @@ async function load(){
       books=await loadDirect(tab);
     }
     books=dedupeBooks(books.map(norm));
+    pruneWatchedBooks(books);
     buildFilters(); updateTs(); applyFilters();
     const e=document.querySelector('.err-box'); if(e) e.remove();
   }catch(e){ showErr(e.message); }
@@ -420,21 +423,41 @@ async function loadDirect(currentTab){
   return all;
 }
 
+function getSelectedValues(selectId){
+  const select=document.getElementById(selectId);
+  if(!select) return [];
+  return Array.from(select.selectedOptions).map(option=>option.value).filter(Boolean);
+}
+
+function setSelectedValues(selectId, values){
+  const select=document.getElementById(selectId);
+  if(!select) return;
+  const valueSet=new Set(values);
+  Array.from(select.options).forEach(option=>{ option.selected = valueSet.has(option.value); });
+}
+
+function matchesStateFilter(book, value){
+  if(value==='avail') return Boolean(book.avail && !book.preorder);
+  if(value==='out') return !book.avail || book.availabilityState==='sold-out-online' || book.availabilityState==='temporarily-out-of-stock';
+  if(value==='pre') return Boolean(book.preorder);
+  return true;
+}
+
 function applyFilters(){
   const q=document.getElementById('q').value.toLowerCase();
-  const lang=document.getElementById('fl').value;
-  const fmt=document.getElementById('ff').value;
-  const st=document.getElementById('fs').value;
+  const langs=getSelectedValues('fl');
+  const fmts=getSelectedValues('ff');
+  const lines=getSelectedValues('fr');
+  const states=getSelectedValues('fs');
   const filtered=books.filter(b=>{
     if(tab==='preorder'&&!b.preorder) return false;
     if(tab==='watchlist'&&!watched.has(b.id)) return false;
     if(watchOnly&&!watched.has(b.id)) return false;
     if(q&&!b.title.toLowerCase().includes(q)&&!(b.range||'').toLowerCase().includes(q)) return false;
-    if(lang&&b.lang!==lang) return false;
-    if(fmt&&b.format!==fmt) return false;
-    if(st==='avail'&&(!b.avail||b.preorder)) return false;
-    if(st==='out'&&b.avail) return false;
-    if(st==='pre'&&(!b.preorder||!b.avail)) return false;
+    if(langs.length && (!b.lang || !langs.includes(b.lang))) return false;
+    if(fmts.length && (!b.format || !fmts.includes(b.format))) return false;
+    if(lines.length && (!b.range || !lines.includes(b.range))) return false;
+    if(states.length && !states.some(value=>matchesStateFilter(b,value))) return false;
     return true;
   });
   document.getElementById('cnt').textContent=filtered.length+' livro'+(filtered.length!==1?'s':'');
@@ -443,12 +466,31 @@ function applyFilters(){
 
 function buildFilters(){
   const ln={en:'🇬🇧 Inglês',de:'🇩🇪 Alemão',fr:'🇫🇷 Francês',es:'🇪🇸 Espanhol',it:'🇮🇹 Italiano',pl:'🇵🇱 Polaco',pt:'🇵🇹 Português'};
+  const prevLangs=getSelectedValues('fl');
+  const prevFmts=getSelectedValues('ff');
+  const prevLines=getSelectedValues('fr');
+  const prevStates=getSelectedValues('fs');
   const langs=[...new Set(books.map(b=>b.lang).filter(Boolean))].sort();
   const fmts=[...new Map(books.filter(b=>b.format).map(b=>[b.format,b.formatLabel||b.format])).entries()].sort((a,b)=>a[1].localeCompare(b[1]));
-  const lsel=document.getElementById('fl'); const cl=lsel.value;
-  lsel.innerHTML='<option value="">Todos os idiomas</option>'+langs.map(l=>`<option value="${l}"${l===cl?' selected':''}>${ln[l]||l.toUpperCase()}</option>`).join('');
-  const fsel=document.getElementById('ff'); const cf=fsel.value;
-  fsel.innerHTML='<option value="">Todos os formatos</option>'+fmts.map(([value,label])=>`<option value="${value}"${value===cf?' selected':''}>${label}</option>`).join('');
+  const ranges=[...new Set(books.map(b=>b.range).filter(Boolean))].sort();
+  const lsel=document.getElementById('fl');
+  lsel.innerHTML='<option value="">Todos os idiomas</option>'+langs.map(l=>`<option value="${l}"${prevLangs.includes(l)?' selected':''}>${ln[l]||l.toUpperCase()}</option>`).join('');
+  const fsel=document.getElementById('ff');
+  fsel.innerHTML='<option value="">Todos os formatos</option>'+fmts.map(([value,label])=>`<option value="${value}"${prevFmts.includes(value)?' selected':''}>${label}</option>`).join('');
+  const rsel=document.getElementById('fr');
+  rsel.innerHTML='<option value="">Todas as linhas</option>'+ranges.map(value=>`<option value="${value}"${prevLines.includes(value)?' selected':''}>${value}</option>`).join('');
+  const ssel=document.getElementById('fs');
+  ssel.innerHTML='<option value="">Todos os estados</option><option value="avail"'+(prevStates.includes('avail')?' selected':'')+'>✅ Disponível</option><option value="out"'+(prevStates.includes('out')?' selected':'')+'>❌ Esgotado</option><option value="pre"'+(prevStates.includes('pre')?' selected':'')+'>🕐 Pré-encomenda</option>';
+}
+
+function pruneWatchedBooks(currentBooks){
+  const currentIds=new Set(currentBooks.map(b=>b.id).filter(Boolean));
+  const previousSize=watched.size;
+  watched=new Set([...watched].filter(id=>currentIds.has(id)));
+  if(previousSize!==watched.size){
+    localStorage.setItem('wh_w',JSON.stringify([...watched]));
+    updateBadge();
+  }
 }
 
 function render(list){
@@ -465,8 +507,10 @@ function render(list){
   }
   el.innerHTML='<div class="grid">'+list.map(b=>{
     const isW=watched.has(b.id);
-    const sc=!b.avail?'ou':(b.preorder?'pr':'av');
-    const sl=!b.avail?'❌ Esgotado':(b.preorder?'🕐 Pré-encomenda':'✅ Disponível');
+    const stateKey=(b.availabilityState||'available');
+    const stateClass=stateKey==='available'?'av':(stateKey==='preorder'?'pr':'ou');
+    const statusLabel = stateKey==='sold-out-online' ? '❌ Sold out online' : (stateKey==='temporarily-out-of-stock' ? '⚠️ Temporarily out of stock' : (b.preorder?'🕐 Pre-order':'✅ Available'));
+    const stateColor = stateKey==='sold-out-online' ? '#e74c3c' : (stateKey==='temporarily-out-of-stock' ? '#f39c12' : (b.preorder ? '#3498db' : '#2ecc71'));
     const url=shopUrl(b.url);
     const img=b.image?`<div class="imgbox"><img class="ci" src="${b.image}" alt="" loading="lazy" onerror="this.parentElement.outerHTML='<div class=cp>📚</div>'"></div>`:`<div class="cp">📚</div>`;
     return `<div class="card${isW?' w':''}">
@@ -480,13 +524,14 @@ function render(list){
           ${b.lang?`<span class="mt">${b.lang.toUpperCase()}</span>`:''}
         </div>
         <div class="cf">
-          <span class="st ${sc}">${sl}</span>
+          <span class="st ${stateClass}" style="border-color:${stateColor};color:${stateColor};background:${stateColor}10">${statusLabel}</span>
           <span class="pr">${b.price}</span>
         </div>
         <div class="ca">
           <button class="bs${isW?' on':''}" onclick="toggleWatch('${b.id}')">
             ${isW?'🔔 A vigiar':'🔕 Vigiar'}
           </button>
+          ${isW?`<button class="bs" onclick="openHistory('${b.id}')">📜 Hist.</button>`:''}
           ${url?`<button class="bs" onclick="window.open('${url}','_blank')">🔗 Loja</button>`:''}
         </div>
       </div>
@@ -498,6 +543,19 @@ async function toggleWatch(id){
   watched.has(id)?watched.delete(id):watched.add(id);
   localStorage.setItem('wh_w',JSON.stringify([...watched]));
   updateBadge(); applyFilters(); await pushWatched();
+}
+
+async function openHistory(id){
+  const panel=document.getElementById('history-panel');
+  panel.style.display='block';
+  try{
+    const r=await fetch(PROXY+'/history/'+encodeURIComponent(id));
+    const data=await r.json();
+    const entries=data.history||[];
+    panel.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><strong style="color:#c9a84c">Última semana</strong><button class="bs" onclick="document.getElementById('history-panel').style.display='none'">Fechar</button></div>${entries.length?entries.map(entry=>`<div style="padding:8px 0;border-top:1px solid rgba(201,168,76,.1);font-size:12px;color:#8a7f6e"><div>${new Date(entry.ts).toLocaleString('pt-PT')}</div><div style="color:#c0b49e">${entry.available?'Available':'Unavailable'} · ${entry.preorder?'Pre-order':''} · ${entry.availabilityState}</div></div>`).join(''):'<div style="font-size:12px;color:#6b6358">Ainda não existem registos para este livro.</div>'}`;
+  }catch(e){
+    panel.innerHTML=`<div style="font-size:12px;color:#e74c3c">Não foi possível carregar a história.</div>`;
+  }
 }
 
 function toggleWatchOnly(){ watchOnly=!watchOnly; document.getElementById('bwo').classList.toggle('on',watchOnly); applyFilters(); }

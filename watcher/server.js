@@ -56,7 +56,7 @@ console.log('ALGOLIA IDX:', CONFIG.algoliaIdx);
 console.log('Config:', { discordEnabled: CONFIG.discordEnabled, discordWebhook: CONFIG.discordWebhook, emailEnabled: CONFIG.emailEnabled, emailTo: CONFIG.emailTo, dataFile: CONFIG.dataFile });
 
 // ─── STATE ──────────────────────────────────────────────
-let state = { watched: [], lastStatus: {}, lastSeen: {} };
+let state = { watched: [], lastStatus: {}, lastSeen: {}, history: {} };
 
 function loadState() {
   try {
@@ -74,6 +74,22 @@ function saveState() {
     fs.mkdirSync(path.dirname(CONFIG.dataFile), { recursive: true });
     fs.writeFileSync(CONFIG.dataFile, JSON.stringify(state, null, 2));
   } catch(e) { log('Erro ao guardar estado: ' + e.message); }
+}
+
+function recordHistory(book) {
+  if (!book?.id) return;
+  const history = state.history[book.id] || [];
+  const latest = history[history.length - 1];
+  const snapshot = {
+    ts: new Date().toISOString(),
+    availabilityState: book.availabilityState || 'unknown',
+    available: Boolean(book.avail),
+    preorder: Boolean(book.preorder),
+  };
+  const changed = !latest || latest.availabilityState !== snapshot.availabilityState || latest.available !== snapshot.available || latest.preorder !== snapshot.preorder;
+  if (changed) {
+    state.history[book.id] = [...history, snapshot].slice(-14);
+  }
 }
 
 // ─── LOGGING ────────────────────────────────────────────
@@ -166,6 +182,57 @@ function isBuyable(h) {
   return truthy(h.canAddToCart) || truthy(h.purchasable) || truthy(h.isOrderable) || truthy(h.orderable) || truthy(h.isInStock) || truthy(h.inStock) || truthy(h.isAvailable);
 }
 
+function normalizeAvailabilityState(h) {
+  const raw = pickFirst(h.availability, h.availabilityStatus, h.productStatus, h.stockStatus, h.onlineStockStatus, h.stock_status);
+  const rawTextValue = rawText(raw).trim().toLowerCase();
+  const qty = pickFirst(h.stockLevel, h.stockQuantity, h.quantityAvailable, h.inventory);
+  const numericQty = qty != null && qty !== '' ? Number(qty) : null;
+  const isPreOrder = truthy(h.isPreOrder) || /pre[- ]?order/i.test(rawTextValue);
+
+  if (isPreOrder) {
+    return { key: 'preorder', label: 'Pre-order', color: '#3498db', soldOut: false, available: false, message: 'Pre-order' };
+  }
+
+  if (/(sold out online|out of stock and is due to be removed from the webstore)/i.test(rawTextValue)) {
+    return { key: 'sold-out-online', label: 'Sold out online', color: '#e74c3c', soldOut: true, available: false, message: 'Sold out online' };
+  }
+
+  if (/(temporarily out of stock|notify me|stock for this item may return)/i.test(rawTextValue)) {
+    return { key: 'temporarily-out-of-stock', label: 'Temporarily out of stock', color: '#f39c12', soldOut: true, available: false, message: 'Temporarily out of stock' };
+  }
+
+  if (numericQty !== null && numericQty <= 0) {
+    return { key: 'sold-out-online', label: 'Sold out online', color: '#e74c3c', soldOut: true, available: false, message: 'Sold out online' };
+  }
+
+  if (falsey(h.isInStock) || falsey(h.inStock) || falsey(h.isOrderable) || falsey(h.orderable) || falsey(h.purchasable) || falsey(h.canAddToCart) || truthy(h.addToCartDisabled)) {
+    return { key: 'sold-out-online', label: 'Sold out online', color: '#e74c3c', soldOut: true, available: false, message: 'Sold out online' };
+  }
+
+  if (isBuyable(h) || truthy(h.isAvailable) || truthy(h.avail)) {
+    return { key: 'available', label: 'Available', color: '#2ecc71', soldOut: false, available: true, message: 'Available' };
+  }
+
+  return { key: 'unknown', label: 'Unknown', color: '#8a7f6e', soldOut: false, available: false, message: 'Unknown' };
+}
+
+function getTransitionMessage(prevState, currState) {
+  const prevKey = prevState?.key || prevState;
+  const currKey = currState?.key || currState;
+  const map = {
+    'preorder:available': 'Pre-order → Available',
+    'available:sold-out-online': 'In stock → Sold out online',
+    'available:temporarily-out-of-stock': 'In stock → Temporarily out of stock',
+    'sold-out-online:available': 'Sold out online → Back in stock',
+    'temporarily-out-of-stock:available': 'Temporarily out of stock → Back in stock',
+    'preorder:sold-out-online': 'Pre-order → Sold out online',
+    'preorder:temporarily-out-of-stock': 'Pre-order → Temporarily out of stock',
+    'sold-out-online:temporarily-out-of-stock': 'Sold out online → Temporarily out of stock',
+    'temporarily-out-of-stock:sold-out-online': 'Temporarily out of stock → Sold out online',
+  };
+  return map[`${prevKey}:${currKey}`] || `${prevState?.label || prevKey || 'Unknown'} → ${currState?.label || currKey || 'Unknown'}`;
+}
+
 function normalizeImage(h) {
   const candidate = pickFirst(
     h.imageUrl,
@@ -238,24 +305,29 @@ function normalizeUrl(path) {
 }
 
 function normalizeBook(h) {
-  const preorder = truthy(h.isPreOrder);
-  const available = !isSoldOut(h) && isBuyable(h);
+  const availabilityState = normalizeAvailabilityState(h);
+  const preorder = availabilityState.key === 'preorder' || truthy(h.isPreOrder);
+  const available = availabilityState.available;
   const price = pickFirst(h.salePrice, h.price);
   const title = h.name || h.title || '—';
   const url = pickFirst(h.url, h.slug, h.productUrl, h.canonicalUrl, h.path);
   const format = normalizeFormat(pickFirst(h.format, h.bookFormat, h.productFormat), title, url);
   return {
-    id:       h.productCode || h.objectID,
+    id:                  h.productCode || h.objectID,
     title,
-    price:    formatPrice(price),
-    lang:     normalizeLanguage(h.language, title, url),
-    type:     h.productType || 'book',
+    price:               formatPrice(price),
+    lang:                normalizeLanguage(h.language, title, url),
+    type:                h.productType || 'book',
     format,
-    avail:    available,
+    avail:               available,
     preorder,
-    image:    normalizeImage(h),
-    url:      normalizeUrl(url),
-    range:    h.range       || null,
+    image:               normalizeImage(h),
+    url:                 normalizeUrl(url),
+    range:               h.range || null,
+    availabilityState:   availabilityState.key,
+    availabilityLabel:   availabilityState.label,
+    availabilityColor:   availabilityState.color,
+    availabilityMessage: availabilityState.message,
   };
 }
 
@@ -295,6 +367,7 @@ function buildEmailHtml(alerts) {
         <strong>${b.title}</strong>
         ${b.range ? `<br><span style="color:#8a7f6e;font-size:12px">${b.range}</span>` : ''}
         ${b.format ? `<br><span style="color:#6b6358;font-size:11px">${b.format}</span>` : ''}
+        <br><span style="color:${b.availabilityColor || '#c9a84c'};font-size:11px;font-weight:600">${b.transitionMessage || 'Availability changed'}</span>
       </td>
       <td style="padding:12px;color:#c9a84c;font-weight:bold">${b.price}</td>
       <td style="padding:12px">
@@ -308,7 +381,7 @@ function buildEmailHtml(alerts) {
   <div style="background:linear-gradient(135deg,#0a0a0a,#1a0800);padding:24px;border-bottom:2px solid #c9a84c">
     <h1 style="color:#c9a84c;margin:0;font-size:22px">⚙ Biblioteca Imperial</h1>
     <p style="color:#8a7f6e;margin:6px 0 0;font-size:13px">
-      ${alerts.length} livro(s) que estavas a vigiar estão novamente disponíveis!
+      ${alerts.length} livro(s) que estavas a vigiar mudaram de estado.
     </p>
   </div>
   <table style="width:100%;border-collapse:collapse">
@@ -362,23 +435,26 @@ function sendDiscord(alerts) {
 
   const embeds = alerts.slice(0, 10).map(b => {
     const url = b.url ? (b.url.startsWith('http') ? b.url : `https://www.warhammer.com/en-EU/shop/${b.url}`) : null;
+    const colorHex = b.availabilityColor || '#2ecc71';
+    const colorNumerical = parseInt(colorHex.replace('#', ''), 16);
     return {
       title: b.title,
       description: [
         b.range  ? `📚 **Série:** ${b.range}`   : null,
         b.format ? `📖 **Formato:** ${b.format}` : null,
+        `🔄 **Transição:** ${b.transitionMessage || 'Availability changed'}`,
         `💶 **Preço:** ${b.price}`,
         url ? `🔗 **[Comprar agora](${url})**` : null,
         b.image ? `![image](${b.image})` : null
       ].filter(Boolean).join('\n'),
-      color: 0x2ecc71,
+      color: Number.isNaN(colorNumerical) ? 0x2ecc71 : colorNumerical,
       timestamp: new Date().toISOString(),
     };
   });
 
   const payload = JSON.stringify({
     username:   '⚙ Biblioteca Imperial',
-    content:    `🚨 **${alerts.length} livro(s) voltaram a estar disponíveis!**`,
+    content:    `🚨 **${alerts.length} livro(s) mudaram de estado:**\n${alerts.map(b => `- ${b.title}: ${b.transitionMessage || 'Availability changed'}`).join('\n')}`,
     embeds,
   });
 
@@ -407,8 +483,8 @@ function sendDiscord(alerts) {
 
 async function notify(alerts) {
   if (!alerts.length) return;
-  log(`[Notify] Stock reposto: ${alerts.map(b => b.title).join(', ')}`);
-  const subject = `📦 WH40K — ${alerts.length} livro(s) disponíveis!`;
+  log(`[Notify] Transições: ${alerts.map(b => `${b.title} (${b.transitionMessage})`).join(', ')}`);
+  const subject = `📦 WH40K — ${alerts.length} livro(s) mudaram de estado`;
   await Promise.all([
     sendEmail(subject, buildEmailHtml(alerts)).catch(e => log('[Email] ' + e.message)),
     sendDiscord(alerts).catch(e => log('[Discord] ' + e.message)),
@@ -422,15 +498,27 @@ async function checkWatched() {
   if (!state.watched.length) return;
   log(`[Watcher] A verificar ${state.watched.length} livro(s)...`);
   try {
-    const books  = await fetchBooks('all');
+    const books = await fetchBooks('all');
     const alerts = [];
     for (const book of books) {
       state.lastSeen[book.id] = book;
       if (state.watched.includes(book.id)) {
-        const prev = state.lastStatus[book.id];
-        const curr = book.avail && !book.preorder;
-        if (prev === false && curr === true) alerts.push(book);
-        state.lastStatus[book.id] = curr;
+        recordHistory(book);
+        const prevStatus = state.lastStatus[book.id];
+        const currStatus = {
+          key: book.availabilityState || 'unknown',
+          label: book.availabilityLabel || 'Unknown',
+          color: book.availabilityColor || '#8a7f6e',
+          soldOut: Boolean(book.availabilityState && book.availabilityState !== 'available' && book.availabilityState !== 'preorder'),
+          available: Boolean(book.avail),
+        };
+        const prevKey = prevStatus?.key || prevStatus;
+        const currKey = currStatus.key;
+        const shouldNotify = prevKey && prevKey !== currKey && prevKey !== undefined && currKey !== undefined;
+        if (shouldNotify) {
+          alerts.push({ ...book, transitionMessage: getTransitionMessage(prevStatus, currStatus) });
+        }
+        state.lastStatus[book.id] = currStatus;
       }
     }
     saveState();
@@ -529,6 +617,12 @@ const server = http.createServer(async (req, res) => {
     return json(res, 200, { ok: true });
   }
 
+  if (url.pathname.startsWith('/history/') && req.method === 'GET') {
+    const id = decodeURIComponent(url.pathname.slice('/history/'.length));
+    const entries = (state.history[id] || []).filter(entry => Date.now() - new Date(entry.ts).getTime() <= 7 * 24 * 60 * 60 * 1000);
+    return json(res, 200, { id, history: entries });
+  }
+
   if (url.pathname === '/test-notify' && req.method === 'POST') {
     await notify([{
       id: 'TEST', title: "Horus Rising (Collector's Edition) — TESTE",
@@ -542,14 +636,21 @@ const server = http.createServer(async (req, res) => {
 });
 
 // ─── BOOT ───────────────────────────────────────────────
-loadState();
-startWatcher();
-server.listen(CONFIG.port, () => {
-  log(`[Server] A correr em http://localhost:${CONFIG.port}`);
-  log(`[Server] Frontend: ${FRONTEND_FILE}`);
-  log(`[Server] Email: ${CONFIG.emailEnabled ? CONFIG.emailTo : 'desativado'}`);
-  log(`[Server] Discord: ${CONFIG.discordEnabled ? 'ativado' : 'desativado'}`);
-});
+if (require.main === module) {
+  loadState();
+  startWatcher();
+  server.listen(CONFIG.port, () => {
+    log(`[Server] A correr em http://localhost:${CONFIG.port}`);
+    log(`[Server] Frontend: ${FRONTEND_FILE}`);
+    log(`[Server] Email: ${CONFIG.emailEnabled ? CONFIG.emailTo : 'desativado'}`);
+    log(`[Server] Discord: ${CONFIG.discordEnabled ? 'ativado' : 'desativado'}`);
+  });
 
-process.on('SIGTERM', () => { saveState(); process.exit(0); });
-process.on('SIGINT',  () => { saveState(); process.exit(0); });
+  process.on('SIGTERM', () => { saveState(); process.exit(0); });
+  process.on('SIGINT',  () => { saveState(); process.exit(0); });
+}
+
+module.exports = {
+  normalizeAvailabilityState,
+  getTransitionMessage,
+};
