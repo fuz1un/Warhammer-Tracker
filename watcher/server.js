@@ -189,16 +189,20 @@ function normalizeAvailabilityState(h) {
   const qty = pickFirst(h.stockLevel, h.stockQuantity, h.quantityAvailable, h.inventory);
   const numericQty = qty != null && qty !== '' ? Number(qty) : null;
   const isPreOrder = truthy(h.isPreOrder) || /pre[- ]?order/i.test(rawTextValue);
+  const explicitlySoldOut = /(sold out online|out of stock and is due to be removed from the webstore)/i.test(rawTextValue);
+  const explicitlyTemporarilyOut = /(temporarily out of stock|notify me|stock for this item may return)/i.test(rawTextValue);
+  const explicitlyAvailable = /(in stock|available|back in stock)/i.test(rawTextValue);
+  const buyable = isBuyable(h) || truthy(h.isAvailable) || truthy(h.avail);
 
   if (isPreOrder) {
     return { key: 'preorder', label: 'Pre-order', color: '#3498db', soldOut: false, available: false, message: 'Pre-order' };
   }
 
-  if (/(sold out online|out of stock and is due to be removed from the webstore)/i.test(rawTextValue)) {
+  if (explicitlySoldOut) {
     return { key: 'sold-out-online', label: 'Sold out online', color: '#e74c3c', soldOut: true, available: false, message: 'Sold out online' };
   }
 
-  if (/(temporarily out of stock|notify me|stock for this item may return)/i.test(rawTextValue)) {
+  if (explicitlyTemporarilyOut) {
     return { key: 'temporarily-out-of-stock', label: 'Temporarily out of stock', color: '#f39c12', soldOut: true, available: false, message: 'Temporarily out of stock' };
   }
 
@@ -207,10 +211,10 @@ function normalizeAvailabilityState(h) {
   }
 
   if (falsey(h.isInStock) || falsey(h.inStock) || falsey(h.isOrderable) || falsey(h.orderable) || falsey(h.purchasable) || falsey(h.canAddToCart) || truthy(h.addToCartDisabled)) {
-    return { key: 'sold-out-online', label: 'Sold out online', color: '#e74c3c', soldOut: true, available: false, message: 'Sold out online' };
+    return { key: 'temporarily-out-of-stock', label: 'Temporarily out of stock', color: '#f39c12', soldOut: true, available: false, message: 'Temporarily out of stock' };
   }
 
-  if (isBuyable(h) || truthy(h.isAvailable) || truthy(h.avail)) {
+  if (explicitlyAvailable || buyable) {
     return { key: 'available', label: 'Available', color: '#2ecc71', soldOut: false, available: true, message: 'Available' };
   }
 

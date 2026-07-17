@@ -185,10 +185,10 @@ select:focus{border-color:#c9a84c;outline:none}
     <svg class="s-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
     <input type="text" id="q" placeholder="Pesquisar título, série..." oninput="applyFilters()">
   </div>
-  <select id="fl" onchange="applyFilters()" multiple size="4"><option value="">Todos os idiomas</option></select>
-  <select id="ff" onchange="applyFilters()" multiple size="4"><option value="">Todos os formatos</option></select>
-  <select id="fr" onchange="applyFilters()" multiple size="4"><option value="">Todas as linhas</option></select>
-  <select id="fs" onchange="applyFilters()" multiple size="4">
+  <select id="fl" onchange="applyFilters()" size="1"><option value="">Todos os idiomas</option></select>
+  <select id="ff" onchange="applyFilters()" size="1"><option value="">Todos os formatos</option></select>
+  <select id="fr" onchange="applyFilters()" size="1"><option value="">Todas as linhas</option></select>
+  <select id="fs" onchange="applyFilters()" size="1">
     <option value="">Todos os estados</option>
     <option value="avail">✅ Disponível</option>
     <option value="out">❌ Esgotado</option>
@@ -429,41 +429,34 @@ async function loadDirect(currentTab){
   return all;
 }
 
-function getSelectedValues(selectId){
+function getSelectedValue(selectId){
   const select=document.getElementById(selectId);
-  if(!select) return [];
-  return Array.from(select.selectedOptions).map(option=>option.value).filter(Boolean);
-}
-
-function setSelectedValues(selectId, values){
-  const select=document.getElementById(selectId);
-  if(!select) return;
-  const valueSet=new Set(values);
-  Array.from(select.options).forEach(option=>{ option.selected = valueSet.has(option.value); });
+  if(!select) return '';
+  return select.value;
 }
 
 function matchesStateFilter(book, value){
   if(value==='avail') return Boolean(book.avail && !book.preorder);
-  if(value==='out') return !book.avail || book.availabilityState==='sold-out-online' || book.availabilityState==='temporarily-out-of-stock';
+  if(value==='out') return Boolean(!book.avail && (book.availabilityState==='sold-out-online' || book.availabilityState==='temporarily-out-of-stock'));
   if(value==='pre') return Boolean(book.preorder);
   return true;
 }
 
 function applyFilters(){
   const q=document.getElementById('q').value.toLowerCase();
-  const langs=getSelectedValues('fl');
-  const fmts=getSelectedValues('ff');
-  const lines=getSelectedValues('fr');
-  const states=getSelectedValues('fs');
+  const lang=getSelectedValue('fl');
+  const fmt=getSelectedValue('ff');
+  const line=getSelectedValue('fr');
+  const state=getSelectedValue('fs');
   const filtered=books.filter(b=>{
     if(tab==='preorder'&&!b.preorder) return false;
     if(tab==='watchlist'&&!watched.has(b.id)) return false;
     if(watchOnly&&!watched.has(b.id)) return false;
     if(q&&!b.title.toLowerCase().includes(q)&&!(b.range||'').toLowerCase().includes(q)) return false;
-    if(langs.length && (!b.lang || !langs.includes(b.lang))) return false;
-    if(fmts.length && (!b.format || !fmts.includes(b.format))) return false;
-    if(lines.length && (!b.range || !lines.includes(b.range))) return false;
-    if(states.length && !states.some(value=>matchesStateFilter(b,value))) return false;
+    if(lang && b.lang!==lang) return false;
+    if(fmt && b.format!==fmt) return false;
+    if(line && b.range!==line) return false;
+    if(state && !matchesStateFilter(b,state)) return false;
     return true;
   });
   document.getElementById('cnt').textContent=filtered.length+' livro'+(filtered.length!==1?'s':'');
@@ -472,21 +465,21 @@ function applyFilters(){
 
 function buildFilters(){
   const ln={en:'🇬🇧 Inglês',de:'🇩🇪 Alemão',fr:'🇫🇷 Francês',es:'🇪🇸 Espanhol',it:'🇮🇹 Italiano',pl:'🇵🇱 Polaco',pt:'🇵🇹 Português'};
-  const prevLangs=getSelectedValues('fl');
-  const prevFmts=getSelectedValues('ff');
-  const prevLines=getSelectedValues('fr');
-  const prevStates=getSelectedValues('fs');
+  const prevLang=getSelectedValue('fl');
+  const prevFmt=getSelectedValue('ff');
+  const prevLine=getSelectedValue('fr');
+  const prevState=getSelectedValue('fs');
   const langs=[...new Set(books.map(b=>b.lang).filter(Boolean))].sort();
   const fmts=[...new Map(books.filter(b=>b.format).map(b=>[b.format,b.formatLabel||b.format])).entries()].sort((a,b)=>a[1].localeCompare(b[1]));
   const ranges=[...new Set(books.map(b=>b.range).filter(Boolean))].sort();
   const lsel=document.getElementById('fl');
-  lsel.innerHTML='<option value="">Todos os idiomas</option>'+langs.map(l=>`<option value="${l}"${prevLangs.includes(l)?' selected':''}>${ln[l]||l.toUpperCase()}</option>`).join('');
+  lsel.innerHTML='<option value="">Todos os idiomas</option>'+langs.map(l=>`<option value="${l}"${prevLang===l?' selected':''}>${ln[l]||l.toUpperCase()}</option>`).join('');
   const fsel=document.getElementById('ff');
-  fsel.innerHTML='<option value="">Todos os formatos</option>'+fmts.map(([value,label])=>`<option value="${value}"${prevFmts.includes(value)?' selected':''}>${label}</option>`).join('');
+  fsel.innerHTML='<option value="">Todos os formatos</option>'+fmts.map(([value,label])=>`<option value="${value}"${prevFmt===value?' selected':''}>${label}</option>`).join('');
   const rsel=document.getElementById('fr');
-  rsel.innerHTML='<option value="">Todas as linhas</option>'+ranges.map(value=>`<option value="${value}"${prevLines.includes(value)?' selected':''}>${value}</option>`).join('');
+  rsel.innerHTML='<option value="">Todas as linhas</option>'+ranges.map(value=>`<option value="${value}"${prevLine===value?' selected':''}>${value}</option>`).join('');
   const ssel=document.getElementById('fs');
-  ssel.innerHTML='<option value="">Todos os estados</option><option value="avail"'+(prevStates.includes('avail')?' selected':'')+'>✅ Disponível</option><option value="out"'+(prevStates.includes('out')?' selected':'')+'>❌ Esgotado</option><option value="pre"'+(prevStates.includes('pre')?' selected':'')+'>🕐 Pré-encomenda</option>';
+  ssel.innerHTML='<option value="">Todos os estados</option><option value="avail"'+(prevState==='avail'?' selected':'')+'>✅ Disponível</option><option value="out"'+(prevState==='out'?' selected':'')+'>❌ Esgotado</option><option value="pre"'+(prevState==='pre'?' selected':'')+'>🕐 Pré-encomenda</option>';
 }
 
 function pruneWatchedBooks(currentBooks){
