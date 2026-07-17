@@ -57,6 +57,7 @@ console.log('Config:', { discordEnabled: CONFIG.discordEnabled, discordWebhook: 
 
 // ─── STATE ──────────────────────────────────────────────
 let state = { watched: [], lastStatus: {}, lastSeen: {}, history: {} };
+let latestCatalog = { all: [], preorder: [] };
 
 function loadState() {
   try {
@@ -494,11 +495,26 @@ async function notify(alerts) {
 // ─── WATCHER ────────────────────────────────────────────
 let watcherTimers = {};
 
+function scheduleWatcherLoop(key, fn, intervalMs, retryMs = 30000) {
+  if (watcherTimers[key]) clearTimeout(watcherTimers[key]);
+  const run = async () => {
+    try {
+      await fn();
+      watcherTimers[key] = setTimeout(run, intervalMs);
+    } catch (err) {
+      log(`[Watcher/${key}] Erro: ${err.message}`);
+      watcherTimers[key] = setTimeout(run, retryMs);
+    }
+  };
+  watcherTimers[key] = setTimeout(run, intervalMs);
+}
+
 async function checkWatched() {
   if (!state.watched.length) return;
   log(`[Watcher] A verificar ${state.watched.length} livro(s)...`);
   try {
     const books = await fetchBooks('all');
+    latestCatalog.all = books;
     const alerts = [];
     for (const book of books) {
       state.lastSeen[book.id] = book;
@@ -523,24 +539,25 @@ async function checkWatched() {
     }
     saveState();
     if (alerts.length) await notify(alerts);
-  } catch(e) { log('[Watcher] Erro: ' + e.message); }
+  } catch(e) { log('[Watcher] Erro: ' + e.message); throw e; }
 }
 
 async function checkPreorders() {
   try {
     const books = await fetchBooks('preorder');
+    latestCatalog.preorder = books;
     books.forEach(b => { state.lastSeen[b.id] = b; });
     saveState();
-  } catch(e) { log('[Watcher/Preorder] Erro: ' + e.message); }
+  } catch(e) { log('[Watcher/Preorder] Erro: ' + e.message); throw e; }
 }
 
 function startWatcher() {
-  Object.values(watcherTimers).forEach(clearInterval);
+  Object.values(watcherTimers).forEach(clearTimeout);
   log(`[Watcher] Intervalos — vigiados: ${CONFIG.intervalWatched}min, pré-encomendas: ${CONFIG.intervalPreorder}min`);
-  checkWatched();
-  checkPreorders();
-  watcherTimers.watched   = setInterval(checkWatched,   CONFIG.intervalWatched  * 60 * 1000);
-  watcherTimers.preorders = setInterval(checkPreorders, CONFIG.intervalPreorder * 60 * 1000);
+  scheduleWatcherLoop('watched', checkWatched, CONFIG.intervalWatched * 60 * 1000);
+  scheduleWatcherLoop('preorders', checkPreorders, CONFIG.intervalPreorder * 60 * 1000);
+  checkWatched().catch(() => {});
+  checkPreorders().catch(() => {});
 }
 
 // ─── HTTP SERVER ────────────────────────────────────────
@@ -590,7 +607,10 @@ const server = http.createServer(async (req, res) => {
 
   if (url.pathname === '/books' && req.method === 'GET') {
     try {
-      const hits = await fetchBooks(url.searchParams.get('tab') || 'all');
+      const tab = url.searchParams.get('tab') || 'all';
+      const cached = tab === 'preorder' ? latestCatalog.preorder : latestCatalog.all;
+      const hits = cached.length ? cached : await fetchBooks(tab);
+      if (tab === 'preorder') latestCatalog.preorder = hits; else latestCatalog.all = hits;
       return json(res, 200, { hits });
     } catch(e) { return json(res, 500, { error: e.message }); }
   }

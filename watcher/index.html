@@ -228,7 +228,13 @@ let watched = new Set(JSON.parse(localStorage.getItem('wh_w')||'[]'));
 // Boot
 loadSettings();
 checkServer().then(()=>{ if(serverOk) syncWatched(); load(); });
-setInterval(load, 5*60*1000);
+setInterval(()=>{
+  if (document.visibilityState === 'hidden') return;
+  load();
+}, 30000);
+document.addEventListener('visibilitychange', ()=>{
+  if (!document.hidden) load();
+});
 updateBadge();
 
 async function checkServer(){
