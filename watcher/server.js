@@ -194,16 +194,16 @@ function normalizeAvailabilityState(h) {
   const explicitlyAvailable = /(in stock|available|back in stock|now available)/i.test(rawTextValue);
   const buyable = isBuyable(h) || truthy(h.isAvailable) || truthy(h.avail);
 
-  if (isPreOrder) {
-    return { key: 'preorder', label: 'Pre-order', color: '#3498db', soldOut: false, available: false, message: 'Pre-order' };
-  }
-
   if (explicitlyTemporarilyOut || falsey(h.isInStock) || falsey(h.inStock) || falsey(h.isOrderable) || falsey(h.orderable) || falsey(h.purchasable) || falsey(h.canAddToCart) || truthy(h.addToCartDisabled)) {
     return { key: 'temporarily-out-of-stock', label: 'Temporarily out of stock', color: '#f39c12', soldOut: true, available: false, message: 'Temporarily out of stock' };
   }
 
   if (explicitlySoldOut || (numericQty !== null && numericQty <= 0)) {
     return { key: 'sold-out-online', label: 'Sold out online', color: '#e74c3c', soldOut: true, available: false, message: 'Sold out online' };
+  }
+
+  if (isPreOrder) {
+    return { key: 'preorder', label: 'Pre-order', color: '#3498db', soldOut: false, available: false, message: 'Pre-order' };
   }
 
   if (explicitlyAvailable || buyable) {
@@ -303,7 +303,7 @@ function normalizeUrl(path) {
 
 function normalizeBook(h) {
   const availabilityState = normalizeAvailabilityState(h);
-  const preorder = availabilityState.key === 'preorder' || truthy(h.isPreOrder);
+  const preorder = availabilityState.key === 'preorder';
   const available = availabilityState.available;
   const price = pickFirst(h.salePrice, h.price);
   const title = h.name || h.title || '—';
