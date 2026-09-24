@@ -41,7 +41,7 @@ cp watcher/config.example.json watcher/config.json
 docker compose up -d
 ```
 
-4. Open **<http://localhost:8080>**. On Unraid with Tailscale: **<http://100.78.220.87:8080>**
+4. Open **<http://localhost:8080>**.**
 
 ## How to get a Gmail App Password
 
