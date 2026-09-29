@@ -25,7 +25,7 @@ Este projeto combina:
 ### Milestones em progresso
 - [x] Interface de “New Releases” / “Upcoming”
 - [x] Painel de detalhes do livro
-- [ ] Agrupamento por série / autor / leitura
+- [x] Agrupamento por série / autor / leitura
 - [ ] Coleção, wishlist e histórico pessoal
 - [ ] Fluxo de reportar livro em falta ou corrigir metadata
 - [ ] Smoke tests finais e validação integrada
@@ -83,10 +83,10 @@ Responsabilidades:
 - [ ] Mostrar histórico de disponibilidade do livro
 
 ### Fase 4 — Séries e leitura
-- [ ] Agrupar por `series`
+- [x] Agrupar por `series`
 - [ ] Página por série
 - [ ] Página por autor
-- [ ] Ordenação por leitura / cronologia
+- [x] Ordenação por leitura / cronologia
 
 ### Fase 5 — Coleção e wishlist
 - [ ] Listas pessoais: owned / read / wishlist
