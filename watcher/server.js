@@ -116,7 +116,7 @@ const BOOK_ATTRIBUTES = [
   'purchasable', 'canAddToCart', 'addToCartDisabled', 'availability', 'availabilityStatus',
   'productStatus', 'stockStatus', 'onlineStockStatus', 'imageUrl', 'image_url',
   'image', 'images', 'media', 'url', 'slug', 'productUrl', 'canonicalUrl', 'path',
-  'range', 'format', 'bookFormat', 'productFormat'
+  'range', 'format', 'bookFormat', 'productFormat', 'author'
 ];
 
 function algoliaQuery(facetFilters, page = 0, hitsPerPage = 250) {
@@ -401,7 +401,8 @@ function normalizeReleaseDate(value) {
 
 function normalizeCatalogBook(h = {}) {
   const title = sanitizeText(h.title || h.name || 'Untitled');
-  const author = sanitizeText(h.author || h.writer || h.by || h.authors?.[0]);
+  const authorValue = pickFirst(h.author, h.authors, h.writer, h.by);
+  const author = [...new Set((Array.isArray(authorValue) ? authorValue : [authorValue]).map(sanitizeText).filter(Boolean))].join(', ');
   const series = sanitizeText(h.series || h.range || h.collection);
   const releaseDate = normalizeReleaseDate(h.releaseDate || h.firstPublished || h.published || h.date || h.release || h['release-date']);
   const safeUrl = sanitizeUrl(pickFirst(h.url, h.slug, h.productUrl, h.canonicalUrl, h.path));
