@@ -60,13 +60,17 @@ test('adds richer catalog metadata for release browsing', () => {
     id: 'BL-001',
     title: 'Blackheart: Claws of the Maelstrom',
     author: ['Marc Collins'],
-    range: 'Huron Blackheart',
+    series: 'Huron Blackheart',
+    genre: 'Space Fantasy',
     releaseDate: '20 Oct 2026',
     format: 'Hardback',
-    url: '/en-EU/shop/blackheart-claws-of-the-maelstrom'
+    url: '/en-EU/shop/blackheart-claws-of-the-maelstrom',
+    description: '<strong>A novel</strong><br><br>More &amp; more.'
   });
 
   assert.equal(book.series, 'Huron Blackheart');
+  assert.equal(book.genre, 'Space Fantasy');
+  assert.equal(book.summary, 'A novel\n\nMore & more.');
   assert.equal(book.releaseDate, '2026-10-20');
   assert.equal(book.format, 'hardback');
   assert.equal(book.url, 'https://www.warhammer.com/en-EU/shop/blackheart-claws-of-the-maelstrom');
@@ -80,6 +84,7 @@ test('preserves every author on co-authored books', () => {
   });
 
   assert.equal(book.author, 'Guy Haley, Andy Clark, Gav Thorpe');
+  assert.deepEqual(book.authors, ['Guy Haley', 'Andy Clark', 'Gav Thorpe']);
 });
 
 test('allows only trusted origins through the CORS policy', () => {

@@ -361,7 +361,7 @@ select:focus{border-color:#c9a84c;outline:none}
 <script>
 const PROXY = window.location.origin;
 const WH_BASE = 'https://www.warhammer.com/en-EU/';
-const BOOK_ATTRIBUTES = ['name','title','productCode','objectID','salePrice','price','language','productType','isAvailable','isPreOrder','isInStock','inStock','stockLevel','stockQuantity','quantityAvailable','inventory','isOrderable','orderable','purchasable','canAddToCart','addToCartDisabled','availability','availabilityStatus','productStatus','stockStatus','onlineStockStatus','imageUrl','image_url','image','images','media','url','slug','productUrl','canonicalUrl','path','range','format','bookFormat','productFormat'];
+const BOOK_ATTRIBUTES = ['name','title','productCode','objectID','salePrice','price','language','productType','isAvailable','isPreOrder','isInStock','inStock','stockLevel','stockQuantity','quantityAvailable','inventory','isOrderable','orderable','purchasable','canAddToCart','addToCartDisabled','availability','availabilityStatus','productStatus','stockStatus','onlineStockStatus','imageUrl','image_url','image','images','media','url','slug','productUrl','canonicalUrl','path','range','series','format','bookFormat','productFormat','author','genre','description'];
 let books=[], tab='preorder', watchOnly=false, serverOk=false;
 let watched = new Set(JSON.parse(localStorage.getItem('wh_w')||'[]'));
 let watchedBookDetails = [];
@@ -537,6 +537,17 @@ function rawText(value){
   if(value&&typeof value==='object') return rawText(value.name||value.label||value.value||value.title);
   return value==null?'':String(value).trim();
 }
+function normalizeAuthors(...values){
+  return [...new Set(values.flatMap(value=>Array.isArray(value)?value:[value]).map(rawText).filter(Boolean))];
+}
+function summaryText(value){
+  const markup=String(value||'').replace(/<br\s*\/?\s*>/gi,'\n').replace(/<\/(?:p|div|li|h[1-6])\s*>/gi,'\n');
+  const parsed=new DOMParser().parseFromString(markup,'text/html');
+  return (parsed.body.textContent||'').trim();
+}
+function escapeHtml(value){
+  return String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+}
 function cleanKey(value){ return rawText(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/&amp;/g,'and').replace(/[^a-z0-9]+/g,' ').trim(); }
 function formatKey(value,...hints){
   const key=cleanKey([value,...hints].filter(Boolean).join(' '));
@@ -590,6 +601,7 @@ function norm(h){
   }
   const available=availabilityState==='available';
   const rawPrice=pickFirst(h.salePrice,h.price);
+  const authors=normalizeAuthors(h.author,h.authors,h.writer,h.by);
   return {
     id:h.productCode||h.objectID, title,
     price:formatPrice(rawPrice),
@@ -598,6 +610,10 @@ function norm(h){
     preorder,
     soldOut:sold,
     image:imageOf(h), url, range:h.range||null,
+    author:authors.join(', ')||null, authors,
+    series:rawText(h.series||h.range||h.collection)||null,
+    genre:rawText(h.genre)||null,
+    summary:summaryText(h.summary||h.description||h.synopsis)||null,
     availabilityState,
     availabilityLabel: availabilityState==='sold-out-online' ? 'Sold out online' : (availabilityState==='temporarily-out-of-stock' ? 'Temporarily out of stock' : (preorder?'Pre-order':'Available')),
     availabilityColor: availabilityState==='sold-out-online' ? '#e74c3c' : (availabilityState==='temporarily-out-of-stock' ? '#f39c12' : (preorder ? '#3498db' : '#2ecc71')),
@@ -845,7 +861,7 @@ function groupBooksBySeries(items){
   });
 
   for (const book of safeItems) {
-    const key = (book.series || book.range || book.author || 'Outros').trim() || 'Outros';
+    const key = (book.series || book.range || 'Sem série').trim() || 'Sem série';
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(book);
   }
@@ -859,9 +875,12 @@ function groupBooksByAuthor(items){
   );
 
   for (const book of safeItems) {
-    const key = (book.author || 'Sem autor').trim() || 'Sem autor';
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(book);
+    const authors = book.authors?.length ? book.authors : [book.author || 'Sem autor'];
+    for (const author of authors) {
+      const key = String(author || 'Sem autor').trim() || 'Sem autor';
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(book);
+    }
   }
   return [...groups.entries()].sort(([a],[b]) => a.localeCompare(b));
 }
@@ -1039,7 +1058,7 @@ function openBookDetail(id){
           <span class="detail-tag" style="background:${book.availabilityColor || '#c9a84c'}20;border-color:${book.availabilityColor || '#c9a84c'}40;color:${book.availabilityColor || '#c9a84c'}">${status}</span>
           <span class="detail-tag">${book.price || '—'}</span>
         </div>
-        <div class="detail-summary">${summary}</div>
+        <div class="detail-summary">${escapeHtml(summary)}</div>
         ${renderCollectionButtons(book.id)}
         <div class="detail-actions">
           <button class="bs${watched.has(book.id) ? ' on' : ''}" onclick="toggleWatch('${book.id}')">${watched.has(book.id) ? '🔔 A vigiar' : '🔕 Vigiar'}</button>
@@ -1053,6 +1072,7 @@ function openBookDetail(id){
             ${book.range ? `<span class="detail-tag">${book.range}</span>` : ''}
             ${book.lang ? `<span class="detail-tag">${book.lang.toUpperCase()}</span>` : ''}
             ${book.author ? `<span class="detail-tag">Autor: ${book.author}</span>` : ''}
+            ${book.genre ? `<span class="detail-tag">${book.genre}</span>` : ''}
           </div>
         </div>
         <div class="detail-section">

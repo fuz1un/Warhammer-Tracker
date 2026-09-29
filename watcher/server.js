@@ -116,7 +116,7 @@ const BOOK_ATTRIBUTES = [
   'purchasable', 'canAddToCart', 'addToCartDisabled', 'availability', 'availabilityStatus',
   'productStatus', 'stockStatus', 'onlineStockStatus', 'imageUrl', 'image_url',
   'image', 'images', 'media', 'url', 'slug', 'productUrl', 'canonicalUrl', 'path',
-  'range', 'format', 'bookFormat', 'productFormat', 'author'
+  'range', 'series', 'format', 'bookFormat', 'productFormat', 'author', 'genre', 'description'
 ];
 
 function algoliaQuery(facetFilters, page = 0, hitsPerPage = 250) {
@@ -359,6 +359,23 @@ function sanitizeText(value) {
   return rawText(value).replace(/[\u0000-\u001F\u007F]/g, '').trim();
 }
 
+function sanitizeSummary(value) {
+  return sanitizeText(value)
+    .replace(/<br\s*\/?\s*>/gi, '\n')
+    .replace(/<\/(?:p|div|li|h[1-6])\s*>/gi, '\n')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/ *\n */g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 function sanitizeUrl(value) {
   const raw = sanitizeText(value);
   if (!raw) return null;
@@ -401,8 +418,8 @@ function normalizeReleaseDate(value) {
 
 function normalizeCatalogBook(h = {}) {
   const title = sanitizeText(h.title || h.name || 'Untitled');
-  const authorValue = pickFirst(h.author, h.authors, h.writer, h.by);
-  const author = [...new Set((Array.isArray(authorValue) ? authorValue : [authorValue]).map(sanitizeText).filter(Boolean))].join(', ');
+  const authors = [...new Set([h.author, h.authors, h.writer, h.by].flatMap(value => Array.isArray(value) ? value : [value]).map(sanitizeText).filter(Boolean))];
+  const author = authors.join(', ');
   const series = sanitizeText(h.series || h.range || h.collection);
   const releaseDate = normalizeReleaseDate(h.releaseDate || h.firstPublished || h.published || h.date || h.release || h['release-date']);
   const safeUrl = sanitizeUrl(pickFirst(h.url, h.slug, h.productUrl, h.canonicalUrl, h.path));
@@ -411,13 +428,15 @@ function normalizeCatalogBook(h = {}) {
 
   return {
     author: author || null,
+    authors,
     series: series || null,
+    genre: sanitizeText(h.genre) || null,
     slug,
     releaseDate,
     releaseYear: releaseDate ? String(releaseDate).slice(0, 4) : null,
     format: format || 'unknown',
     url: safeUrl,
-    summary: sanitizeText(h.summary || h.description || h.synopsis) || null,
+    summary: sanitizeSummary(h.summary || h.description || h.synopsis) || null,
     isbn: sanitizeText(h.isbn || h.isbn13 || h.isbn_13) || null,
   };
 }
@@ -457,7 +476,9 @@ function normalizeBook(h) {
     availabilityColor:   availabilityState.color,
     availabilityMessage: availabilityState.message,
     author:              catalogMeta.author,
+    authors:             catalogMeta.authors,
     series:              catalogMeta.series,
+    genre:               catalogMeta.genre,
     slug:                catalogMeta.slug,
     releaseDate:         catalogMeta.releaseDate,
     releaseYear:         catalogMeta.releaseYear,
