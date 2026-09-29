@@ -24,7 +24,7 @@ Este projeto combina:
 
 ### Milestones em progresso
 - [x] Interface de “New Releases” / “Upcoming”
-- [ ] Painel de detalhes do livro
+- [x] Painel de detalhes do livro
 - [ ] Agrupamento por série / autor / leitura
 - [ ] Coleção, wishlist e histórico pessoal
 - [ ] Fluxo de reportar livro em falta ou corrigir metadata
@@ -72,14 +72,14 @@ Responsabilidades:
 ### Fase 2 — Releases e descoberta
 - [x] Criar tab “New releases”
 - [ ] Criar tab “Upcoming”
-- [ ] Ordenar por data e mostrar próximos lançamentos
+- [x] Ordenar por data e mostrar próximos lançamentos
 - [ ] Mostrar meses / grupos por data de lançamento
 - [ ] Adicionar paginação ou carregamento incremental
 
 ### Fase 3 — Detalhes do livro
-- [ ] Criar painel modal/side panel para cada livro
-- [ ] Mostrar resumo, autor, série, formato, data de lançamento
-- [ ] Mostrar relação com autores e séries
+- [x] Criar painel modal/side panel para cada livro
+- [x] Mostrar resumo, autor, série, formato, data de lançamento
+- [x] Mostrar relação com autores e séries
 - [ ] Mostrar histórico de disponibilidade do livro
 
 ### Fase 4 — Séries e leitura

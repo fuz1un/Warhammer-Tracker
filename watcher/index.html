@@ -104,6 +104,27 @@ select:focus{border-color:#c9a84c;outline:none}
 .bs{background:none;border:1px solid rgba(201,168,76,.18);border-radius:4px;padding:5px 9px;color:#6b6358;font-size:11px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:4px;font-family:inherit;font-weight:500}
 .bs:hover{border-color:#c9a84c;color:#c9a84c;background:rgba(201,168,76,.06)}
 .bs.on{border-color:#c9a84c;color:#c9a84c;background:rgba(201,168,76,.1)}
+.detail-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);display:none;align-items:center;justify-content:center;z-index:120;padding:24px}
+.detail-panel{width:min(900px,100%);max-height:88vh;overflow:auto;background:#121212;border:1px solid rgba(201,168,76,.22);border-radius:14px;box-shadow:0 24px 60px rgba(0,0,0,.42);padding:0}
+.detail-header{display:flex;justify-content:space-between;align-items:flex-start;padding:18px 20px 14px;border-bottom:1px solid rgba(201,168,76,.12);background:linear-gradient(180deg,rgba(201,168,76,.06),rgba(201,168,76,.02))}
+.detail-header h2{font-size:20px;color:#f1e7d2;line-height:1.3}
+.detail-close{background:none;border:1px solid rgba(201,168,76,.18);color:#c9a84c;border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer}
+.detail-body{display:grid;grid-template-columns:220px 1fr;gap:18px;padding:20px}
+.detail-cover{background:linear-gradient(135deg,#1d1b1a,#2d2112);border:1px solid rgba(201,168,76,.12);border-radius:10px;min-height:250px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.detail-cover img{width:100%;height:100%;object-fit:cover;display:block}
+.detail-cover-fallback{font-size:52px;color:rgba(201,168,76,.18)}
+.detail-content{display:flex;flex-direction:column;gap:12px}
+.detail-meta{display:flex;flex-wrap:wrap;gap:6px}
+.detail-tag{padding:4px 8px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid rgba(201,168,76,.12);font-size:10px;color:#baab8b;text-transform:uppercase;letter-spacing:.06em}
+.detail-summary{font-size:13px;line-height:1.7;color:#a79c89}
+.detail-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+.detail-section{margin-top:8px;padding-top:10px;border-top:1px solid rgba(201,168,76,.08)}
+.detail-section h3{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#8a7f6e;margin-bottom:8px}
+.related-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.related-card{background:#1a1a1a;border:1px solid rgba(201,168,76,.1);border-radius:8px;padding:10px;cursor:pointer;display:flex;flex-direction:column;gap:8px}
+.related-card:hover{border-color:rgba(201,168,76,.3)}
+.related-title{font-size:12px;font-weight:600;color:#e6dcc6;line-height:1.4}
+.related-meta{font-size:10px;color:#8f8268}
 .state-box{text-align:center;padding:60px 24px;color:#6b6358}
 .state-box svg{width:40px;height:40px;margin:0 auto 16px;display:block;color:#c9a84c;opacity:.4}
 .state-box h3{font-size:15px;color:#c0b49e;margin-bottom:8px}
@@ -254,6 +275,11 @@ select:focus{border-color:#c9a84c;outline:none}
   </div>
 </div>
 
+<div id="book-detail-panel" class="detail-overlay" onclick="closeBookDetail(event)">
+  <div class="detail-panel" onclick="event.stopPropagation()">
+    <div id="book-detail-content"></div>
+  </div>
+</div>
 <div id="history-panel" style="display:none;background:#141414;border-top:1px solid rgba(201,168,76,.12);padding:12px 24px"></div>
 <div id="content"></div>
 <div id="toast"></div>
@@ -698,12 +724,93 @@ function render(list){
           <button class="bs${isW?' on':''}" onclick="toggleWatch('${b.id}')">
             ${isW?'🔔 A vigiar':'🔕 Vigiar'}
           </button>
+          <button class="bs" onclick="openBookDetail('${b.id}')">📘 Detalhes</button>
           ${isW?`<button class="bs" onclick="openHistory('${b.id}')">📜 Hist.</button>`:''}
           ${url?`<button class="bs" onclick="window.open('${url}','_blank')">🔗 Loja</button>`:''}
         </div>
       </div>
     </div>`;
   }).join('')+'</div>';
+}
+
+function getBookById(id){
+  return books.find(book => String(book.id) === String(id)) || null;
+}
+
+function getRelatedBooks(book){
+  if (!book) return [];
+  const related = books.filter(candidate => {
+    if (String(candidate.id) === String(book.id)) return false;
+    const sameSeries = Boolean(book.series && candidate.series && String(candidate.series).toLowerCase() === String(book.series).toLowerCase());
+    const sameAuthor = Boolean(book.author && candidate.author && String(candidate.author).toLowerCase() === String(book.author).toLowerCase());
+    return sameSeries || sameAuthor;
+  });
+  return related.slice(0, 4);
+}
+
+function closeBookDetail(event){
+  const panel = document.getElementById('book-detail-panel');
+  if (event && event.target !== panel) return;
+  panel.style.display = 'none';
+}
+
+function openBookDetail(id){
+  const book = getBookById(id);
+  if (!book) return;
+  const related = getRelatedBooks(book);
+  const url = shopUrl(book.url);
+  const panel = document.getElementById('book-detail-panel');
+  const content = document.getElementById('book-detail-content');
+  const summary = book.summary || 'Sem resumo disponível nesta fonte. O livro está listado para acompanhamento e para compra direta quando a loja for carregada.';
+  const image = book.image ? `<img src="${book.image}" alt="${book.title}" onerror="this.style.display='none';this.parentElement.innerHTML='<div class=\'detail-cover-fallback\'>📚</div>'">` : '<div class="detail-cover-fallback">📚</div>';
+  const status = book.availabilityLabel || (book.preorder ? 'Pre-order' : (book.avail ? 'Available' : 'Unavailable'));
+  const relatedHtml = related.length ? related.map(item => `
+    <button class="related-card" type="button" onclick="openBookDetail('${item.id}')">
+      <div class="related-title">${item.title}</div>
+      <div class="related-meta">${item.series || item.author || item.format || 'Warhammer 40K'}</div>
+    </button>
+  `).join('') : '<div style="font-size:12px;color:#8a7f6e;padding:8px 0">Sem títulos relacionados disponíveis.</div>';
+
+  content.innerHTML = `
+    <div class="detail-header">
+      <h2>${book.title}</h2>
+      <button class="detail-close" onclick="closeBookDetail()">Fechar</button>
+    </div>
+    <div class="detail-body">
+      <div class="detail-cover">${image}</div>
+      <div class="detail-content">
+        <div class="detail-meta">
+          ${book.series ? `<span class="detail-tag">${book.series}</span>` : ''}
+          ${book.author ? `<span class="detail-tag">${book.author}</span>` : ''}
+          ${book.format ? `<span class="detail-tag">${book.formatLabel || book.format}</span>` : ''}
+          ${book.releaseDate ? `<span class="detail-tag">📅 ${book.releaseDate}</span>` : ''}
+        </div>
+        <div class="detail-meta">
+          <span class="detail-tag" style="background:${book.availabilityColor || '#c9a84c'}20;border-color:${book.availabilityColor || '#c9a84c'}40;color:${book.availabilityColor || '#c9a84c'}">${status}</span>
+          <span class="detail-tag">${book.price || '—'}</span>
+        </div>
+        <div class="detail-summary">${summary}</div>
+        <div class="detail-actions">
+          <button class="bs${watched.has(book.id) ? ' on' : ''}" onclick="toggleWatch('${book.id}')">${watched.has(book.id) ? '🔔 A vigiar' : '🔕 Vigiar'}</button>
+          ${watched.has(book.id) ? `<button class="bs" onclick="openHistory('${book.id}')">📜 Hist.</button>` : ''}
+          ${url ? `<button class="bs" onclick="window.open('${url}','_blank')">🔗 Loja</button>` : ''}
+        </div>
+        <div class="detail-section">
+          <h3>Detalhes</h3>
+          <div class="detail-meta">
+            ${book.range ? `<span class="detail-tag">${book.range}</span>` : ''}
+            ${book.lang ? `<span class="detail-tag">${book.lang.toUpperCase()}</span>` : ''}
+            ${book.author ? `<span class="detail-tag">Autor: ${book.author}</span>` : ''}
+          </div>
+        </div>
+        <div class="detail-section">
+          <h3>Relacionados</h3>
+          <div class="related-list">${relatedHtml}</div>
+        </div>
+      </div>
+    </div>
+  `;
+  panel.style.display = 'flex';
 }
 
 async function toggleWatch(id){
