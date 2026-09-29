@@ -27,7 +27,7 @@ Este projeto combina:
 - [x] Painel de detalhes do livro
 - [x] Agrupamento por série / autor / leitura
 - [x] Coleção, wishlist e histórico pessoal
-- [ ] Fluxo de reportar livro em falta ou corrigir metadata
+- [x] Fluxo de reportar livro em falta ou corrigir metadata
 - [ ] Smoke tests finais e validação integrada
 
 ---
@@ -94,11 +94,12 @@ Responsabilidades:
 - [x] Marcação rápida por interface
 
 ### Fase 6 — Qualidade e segurança
-- [ ] Revisão de inputs e validação do payload de API
-- [ ] Melhor tratamento de erros e fallbacks
-- [ ] Proteção adicional para acesso futuro global
-- [ ] Limitar exposição de dados sensíveis em logs e respostas
-- [ ] Revisão de CORS e headers HTTP em cenário global
+- [x] Revisão de inputs e validação do payload de API
+- [x] Melhor tratamento de erros e fallbacks
+- [x] Proteção adicional para acesso futuro global
+- [x] Limitar exposição de dados sensíveis em logs e respostas
+- [x] Revisão de CORS e headers HTTP em cenário global
+- [x] Fluxo local de reportar livros com metadata em falta ou incorreta
 
 ### Fase 7 — Operações e manutenção
 - [ ] Testes de regressão para stock e release metadata

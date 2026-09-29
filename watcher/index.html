@@ -114,6 +114,15 @@ select:focus{border-color:#c9a84c;outline:none}
 .collection-btn{background:transparent;border:1px solid rgba(201,168,76,.14);border-radius:4px;padding:4px 7px;color:#7d7160;font-size:10px;cursor:pointer;font-family:inherit;transition:all .2s}
 .collection-btn:hover{border-color:rgba(201,168,76,.38);color:#c9a84c}
 .collection-btn.active{background:rgba(201,168,76,.1);border-color:#c9a84c;color:#c9a84c}
+.report-modal{position:fixed;inset:0;background:rgba(0,0,0,.72);display:none;align-items:center;justify-content:center;z-index:130;padding:24px}
+.report-panel{width:min(560px,100%);background:#121212;border:1px solid rgba(201,168,76,.2);border-radius:12px;padding:20px;box-shadow:0 24px 65px rgba(0,0,0,.42)}
+.report-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.report-header h3{font-size:18px;color:#f1e7d2}
+.report-form{display:flex;flex-direction:column;gap:12px}
+.report-form label{display:flex;flex-direction:column;gap:6px;font-size:12px;color:#8a7f6e}
+.report-form select,.report-form textarea{background:#1a1a1a;border:1px solid rgba(201,168,76,.15);border-radius:6px;padding:9px 10px;color:#e8dcc8;font-family:inherit;font-size:13px}
+.report-form textarea{min-height:110px;resize:vertical}
+.report-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:2px}
 .detail-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);display:none;align-items:center;justify-content:center;z-index:120;padding:24px}
 .detail-panel{width:min(900px,100%);max-height:88vh;overflow:auto;background:#121212;border:1px solid rgba(201,168,76,.22);border-radius:14px;box-shadow:0 24px 60px rgba(0,0,0,.42);padding:0}
 .detail-header{display:flex;justify-content:space-between;align-items:flex-start;padding:18px 20px 14px;border-bottom:1px solid rgba(201,168,76,.12);background:linear-gradient(180deg,rgba(201,168,76,.06),rgba(201,168,76,.02))}
@@ -295,6 +304,41 @@ select:focus{border-color:#c9a84c;outline:none}
   </div>
 </div>
 
+<div id="report-modal" class="report-modal" onclick="closeReportModal(event)">
+  <div class="report-panel" onclick="event.stopPropagation()">
+    <div class="report-header">
+      <h3>⚠ Reportar correção</h3>
+      <button class="detail-close" onclick="closeReportModal()">Fechar</button>
+    </div>
+    <div class="report-form">
+      <input type="hidden" id="report-book-id">
+      <label>
+        Livro
+        <input type="text" id="report-book-title" readonly>
+      </label>
+      <label>
+        Tipo de problema
+        <select id="report-type">
+          <option value="missing-data">Dados em falta</option>
+          <option value="wrong-title">Título incorreto</option>
+          <option value="wrong-author">Autor incorreto</option>
+          <option value="wrong-series">Série incorreta</option>
+          <option value="wrong-release-date">Data de lançamento errada</option>
+          <option value="wrong-format">Formato incorreto</option>
+          <option value="other">Outro</option>
+        </select>
+      </label>
+      <label>
+        Observações
+        <textarea id="report-note" placeholder="Descreve a correção esperada, por exemplo: ‘A série deve ser ...’"></textarea>
+      </label>
+      <div class="report-actions">
+        <button class="bs" type="button" onclick="closeReportModal()">Cancelar</button>
+        <button class="btn-save" type="button" onclick="submitReport()">Guardar correção</button>
+      </div>
+    </div>
+  </div>
+</div>
 <div id="book-detail-panel" class="detail-overlay" onclick="closeBookDetail(event)">
   <div class="detail-panel" onclick="event.stopPropagation()">
     <div id="book-detail-content"></div>
@@ -312,6 +356,7 @@ let books=[], tab='preorder', watchOnly=false, serverOk=false;
 let watched = new Set(JSON.parse(localStorage.getItem('wh_w')||'[]'));
 let watchedBookDetails = [];
 let collectionState = JSON.parse(localStorage.getItem('wh_collection') || '{}');
+let reports = JSON.parse(localStorage.getItem('wh_reports') || '[]');
 let collectionFilter='all';
 let selectedLangs=[];
 let selectedFormats=[];
@@ -773,6 +818,7 @@ function buildCardHtml(b){
           ${isW?'🔔 A vigiar':'🔕 Vigiar'}
         </button>
         <button class="bs" onclick="openBookDetail('${b.id}')">📘 Detalhes</button>
+        <button class="bs" onclick="openReportDialog('${b.id}')">⚠ Reportar</button>
         ${isW?`<button class="bs" onclick="openHistory('${b.id}')">📜 Hist.</button>`:''}
         ${url?`<button class="bs" onclick="window.open('${url}','_blank')">🔗 Loja</button>`:''}
       </div>
@@ -847,6 +893,48 @@ function closeBookDetail(event){
   panel.style.display = 'none';
 }
 
+function closeReportModal(event){
+  const panel = document.getElementById('report-modal');
+  if (event && event.target !== panel) return;
+  panel.style.display = 'none';
+  document.getElementById('report-note').value = '';
+  document.getElementById('report-book-id').value = '';
+  document.getElementById('report-book-title').value = '';
+}
+
+function openReportDialog(id){
+  const book = getBookById(id);
+  if (!book) return;
+  const panel = document.getElementById('report-modal');
+  document.getElementById('report-book-id').value = String(book.id);
+  document.getElementById('report-book-title').value = book.title || 'Livro sem título';
+  document.getElementById('report-type').value = 'missing-data';
+  document.getElementById('report-note').value = '';
+  panel.style.display = 'flex';
+}
+
+function submitReport(){
+  const id = document.getElementById('report-book-id').value;
+  const title = document.getElementById('report-book-title').value || 'Livro sem título';
+  const type = document.getElementById('report-type').value || 'missing-data';
+  const note = (document.getElementById('report-note').value || '').trim();
+
+  if (!id) return;
+
+  reports.unshift({
+    id: String(id),
+    title,
+    type,
+    note,
+    createdAt: new Date().toISOString(),
+  });
+
+  reports = reports.slice(0, 50);
+  localStorage.setItem('wh_reports', JSON.stringify(reports));
+  closeReportModal();
+  toast('Correção guardada', 'O relatório foi salvo localmente para revisão futura.', 4000);
+}
+
 function openBookDetail(id){
   const book = getBookById(id);
   if (!book) return;
@@ -886,6 +974,7 @@ function openBookDetail(id){
         ${renderCollectionButtons(book.id)}
         <div class="detail-actions">
           <button class="bs${watched.has(book.id) ? ' on' : ''}" onclick="toggleWatch('${book.id}')">${watched.has(book.id) ? '🔔 A vigiar' : '🔕 Vigiar'}</button>
+          <button class="bs" onclick="openReportDialog('${book.id}')">⚠ Reportar</button>
           ${watched.has(book.id) ? `<button class="bs" onclick="openHistory('${book.id}')">📜 Hist.</button>` : ''}
           ${url ? `<button class="bs" onclick="window.open('${url}','_blank')">🔗 Loja</button>` : ''}
         </div>
