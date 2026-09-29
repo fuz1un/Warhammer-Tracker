@@ -23,7 +23,7 @@ Este projeto combina:
 - [x] Testes iniciais para estados de stock e normalização
 
 ### Milestones em progresso
-- [ ] Interface de “New Releases” / “Upcoming”
+- [x] Interface de “New Releases” / “Upcoming”
 - [ ] Painel de detalhes do livro
 - [ ] Agrupamento por série / autor / leitura
 - [ ] Coleção, wishlist e histórico pessoal
@@ -70,7 +70,7 @@ Responsabilidades:
 - [ ] Expor filtros mais ricos no frontend (`series`, `author`, `releaseDate`, etc.)
 
 ### Fase 2 — Releases e descoberta
-- [ ] Criar tab “New releases”
+- [x] Criar tab “New releases”
 - [ ] Criar tab “Upcoming”
 - [ ] Ordenar por data e mostrar próximos lançamentos
 - [ ] Mostrar meses / grupos por data de lançamento

@@ -173,6 +173,10 @@ select:focus{border-color:#c9a84c;outline:none}
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
     Pré-encomendas
   </button>
+  <button class="tab" id="tab-releases" onclick="switchTab('releases')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="8"/></svg>
+    Novidades
+  </button>
   <button class="tab" id="tab-all" onclick="switchTab('all')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
     Todos os livros
@@ -324,7 +328,9 @@ async function load(){
   await checkServer();
   try{
     let hits=[];
-    if(serverOk){
+    if(tab === 'releases') {
+      hits = await loadReleases();
+    } else if(serverOk){
       const r=await fetch(PROXY+'/books?tab='+tab);
       if(!r.ok) throw new Error('HTTP '+r.status);
       const d=await r.json();
@@ -339,6 +345,33 @@ async function load(){
     const e=document.querySelector('.err-box'); if(e) e.remove();
   }catch(e){ showErr(e.message); }
   finally{ spin(false); }
+}
+
+async function loadReleases(){
+  if(serverOk){
+    const r = await fetch(PROXY+'/releases');
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d = await r.json();
+    return (d.recent || []).map(item => ({
+      id: item.slug || item.id || item.title,
+      title: item.title || 'Unknown title',
+      author: item.author || null,
+      series: item.series || null,
+      range: item.series || null,
+      releaseDate: item.releaseDate || null,
+      format: item.format || 'unknown',
+      url: item.url || null,
+      price: '—',
+      availabilityState: 'available',
+      avail: true,
+      preorder: false,
+      image: null,
+      lang: 'en',
+      productType: 'book',
+      ...item,
+    }));
+  }
+  return [];
 }
 
 function pickFirst(...values){ return values.find(v=>v!==undefined&&v!==null&&v!==''); }
@@ -636,12 +669,15 @@ function render(list){
   }
   el.innerHTML='<div class="grid">'+list.map(b=>{
     const isW=watched.has(b.id);
+    const isReleaseTab = tab === 'releases';
     const stateKey=(b.availabilityState || (b.preorder ? 'preorder' : (b.avail === false ? (b.soldOut ? 'sold-out-online' : 'temporarily-out-of-stock') : 'available')));
     const stateClass=(stateKey==='available'?'av':(stateKey==='preorder'?'pr':'ou'));
     const statusLabel = b.availabilityLabel || (stateKey==='sold-out-online' ? '❌ Sold out online' : (stateKey==='temporarily-out-of-stock' ? '⚠️ Temporarily out of stock' : (b.preorder?'🕐 Pre-order':'✅ Available')));
     const stateColor = b.availabilityColor || (stateKey==='sold-out-online' ? '#e74c3c' : (stateKey==='temporarily-out-of-stock' ? '#f39c12' : (b.preorder ? '#3498db' : '#2ecc71')));
     const url=shopUrl(b.url);
     const img=b.image?`<div class="imgbox"><img class="ci" src="${b.image}" alt="" loading="lazy" onerror="this.parentElement.outerHTML='<div class=cp>📚</div>'"></div>`:`<div class="cp">📚</div>`;
+    const releaseMeta = isReleaseTab && b.releaseDate ? `<span class="mt">📅 ${b.releaseDate}</span>` : '';
+    const authorMeta = b.author ? `<span class="mt">✍️ ${b.author}</span>` : '';
     return `<div class="card${isW?' w':''}">
       ${isW?'<span class="wb">🔔 A vigiar</span>':''}
       ${img}
@@ -650,10 +686,12 @@ function render(list){
         <div class="cm">
           ${b.range?`<span class="mt">${b.range}</span>`:''}
           ${b.format?`<span class="mt">${b.formatLabel||b.format}</span>`:''}
+          ${releaseMeta}
+          ${authorMeta}
           ${b.lang?`<span class="mt">${b.lang.toUpperCase()}</span>`:''}
         </div>
         <div class="cf">
-          <span class="st ${stateClass}" style="border-color:${stateColor};color:${stateColor};background:${stateColor}10">${statusLabel}</span>
+          <span class="st ${stateClass}" style="border-color:${stateColor};color:${stateColor};background:${stateColor}10">${isReleaseTab ? (b.releaseDate ? '📦 Release' : '🆕 Novo') : statusLabel}</span>
           <span class="pr">${b.price}</span>
         </div>
         <div class="ca">
