@@ -27,9 +27,9 @@ function loadConfig() {
     try { file = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')); } catch(e) {}
   }
   return {
-    algoliaApp: process.env.ALGOLIA_APP || file.algoliaApp || 'M5ZIQZNQ2H',
-    algoliaKey: process.env.ALGOLIA_KEY  || file.algoliaKey  || '92c6a8254f9d34362df8e6d96475e5d8',
-    algoliaIdx: process.env.ALGOLIA_IDX  || file.algoliaIdx  || 'prod-lazarus-product-en-eu',
+    algoliaApp: process.env.ALGOLIA_APP || file.algoliaApp || '',
+    algoliaKey: process.env.ALGOLIA_KEY  || file.algoliaKey  || '',
+    algoliaIdx: process.env.ALGOLIA_IDX  || file.algoliaIdx  || '',
     port:       parseInt(process.env.PORT || file.port || 8080),
 
     intervalWatched:  parseInt(process.env.INTERVAL_WATCHED  || file.intervalWatched  || 2),
@@ -42,24 +42,27 @@ function loadConfig() {
     emailPass:    process.env.EMAIL_PASS    || file.emailPass    || '',
     emailTo:      process.env.EMAIL_TO      || file.emailTo      || '',
 
-    discordEnabled: process.env.DISCORD_ENABLED === 'true' || file.discordEnabled || true,
-    discordWebhook: process.env.DISCORD_WEBHOOK || file.discordWebhook || 'https://discord.com/api/webhooks/1517298345910075593/IZotSE5ip9yGUDYGZDXgPhzAFDFoSddrTDwPHUCunyx0bMhDw56AssDoQ0z7KbBcfQMP',
+    discordEnabled: process.env.DISCORD_ENABLED === 'true' || file.discordEnabled || false,
+    discordWebhook: process.env.DISCORD_WEBHOOK || file.discordWebhook || '',
+
+    allowedOrigins: process.env.ALLOWED_ORIGINS || file.allowedOrigins || 'http://localhost:8080,http://localhost:3000,http://127.0.0.1:8080,http://127.0.0.1:3000',
 
     dataFile: resolveDataFile(process.env.DATA_FILE || file.dataFile),
   };
 }
 
 let CONFIG = loadConfig();
-console.log('ALGOLIA APP:', CONFIG.algoliaApp);
-console.log('ALGOLIA KEY:', maskSecret(CONFIG.algoliaKey));
-console.log('ALGOLIA IDX:', CONFIG.algoliaIdx);
-console.log('Config:', {
+console.log('ALGOLIA APP:', CONFIG.algoliaApp ? maskSecret(CONFIG.algoliaApp) : 'not-set');
+console.log('ALGOLIA KEY:', CONFIG.algoliaKey ? maskSecret(CONFIG.algoliaKey) : 'not-set');
+console.log('ALGOLIA IDX:', CONFIG.algoliaIdx || 'not-set');
+console.log('Config:', redactConfig({
   discordEnabled: CONFIG.discordEnabled,
   discordWebhook: CONFIG.discordWebhook ? 'configured' : 'not-set',
   emailEnabled: CONFIG.emailEnabled,
   emailTo: CONFIG.emailTo ? maskEmail(CONFIG.emailTo) : '',
+  allowedOrigins: CONFIG.allowedOrigins,
   dataFile: CONFIG.dataFile,
-});
+}));
 
 // ─── STATE ──────────────────────────────────────────────
 let state = { watched: [], lastStatus: {}, lastSeen: {}, history: {} };
@@ -313,6 +316,34 @@ function maskSecret(value) {
   const text = String(value).trim();
   if (text.length <= 6) return '***';
   return `${text.slice(0, 3)}...${text.slice(-3)}`;
+}
+
+function redactConfig(value = {}) {
+  const config = { ...value };
+  if (config.algoliaKey) config.algoliaKey = maskSecret(config.algoliaKey);
+  if (config.emailPass) config.emailPass = maskSecret(config.emailPass);
+  if (config.discordWebhook) config.discordWebhook = 'configured';
+  if (config.emailTo) config.emailTo = maskEmail(config.emailTo);
+  return config;
+}
+
+function getAllowedOrigins() {
+  const raw = (CONFIG.allowedOrigins || '').split(',').map(entry => entry.trim()).filter(Boolean);
+  if (!raw.length) {
+    return ['http://localhost:8080', 'http://localhost:3000', 'http://127.0.0.1:8080', 'http://127.0.0.1:3000'];
+  }
+  return [...new Set(raw)];
+}
+
+function isAllowedOrigin(origin) {
+  if (!origin) return true;
+  const allowed = getAllowedOrigins();
+  return allowed.some(entry => entry === origin || entry === '*' || (entry.endsWith('/*') && origin.startsWith(entry.slice(0, -1))));
+}
+
+function resolveCorsOrigin(origin) {
+  if (!origin) return getAllowedOrigins()[0];
+  return isAllowedOrigin(origin) ? origin : getAllowedOrigins()[0];
 }
 
 function maskEmail(value) {
@@ -705,9 +736,15 @@ function readBody(req) {
 }
 
 const server = http.createServer(async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const requestOrigin = req.headers.origin;
+  const allowOrigin = resolveCorsOrigin(requestOrigin);
+  res.setHeader('Access-Control-Allow-Origin', allowOrigin);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'no-referrer');
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
   const url = new URL(req.url, `http://localhost:${CONFIG.port}`);
@@ -827,4 +864,6 @@ module.exports = {
   normalizeReleaseDate,
   sanitizeUrl,
   normalizeCatalogBook,
+  isAllowedOrigin,
+  redactConfig,
 };

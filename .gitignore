@@ -1,0 +1,9 @@
+# Local runtime config
+watcher/config.json
+watcher/data/
+.env
+.env.*
+
+# OS/editor noise
+.DS_Store
+Thumbs.db

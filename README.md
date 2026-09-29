@@ -28,6 +28,7 @@ Este projeto combina:
 - [x] Agrupamento por série / autor / leitura
 - [x] Coleção, wishlist e histórico pessoal
 - [x] Fluxo de reportar livro em falta ou corrigir metadata
+- [x] Hardening de configuração e CORS para uso local/seguro
 - [ ] Smoke tests finais e validação integrada
 
 ---
@@ -99,6 +100,7 @@ Responsabilidades:
 - [x] Proteção adicional para acesso futuro global
 - [x] Limitar exposição de dados sensíveis em logs e respostas
 - [x] Revisão de CORS e headers HTTP em cenário global
+- [x] Configuração segura por ambiente/local e ignorar ficheiros sensíveis no Git
 - [x] Fluxo local de reportar livros com metadata em falta ou incorreta
 
 ### Fase 7 — Operações e manutenção
@@ -117,6 +119,7 @@ Responsabilidades:
 - Validar todas as URLs externas antes de as usar
 - Evitar `javascript:` / `data:` / `vbscript:` em links
 - Manter configurações locais e sensíveis fora do frontend
+- Usar allowlist de origens e headers de segurança básicos para qualquer futuro uso público
 
 ### Boas práticas
 - Fazer mudanças pequenas e verificáveis

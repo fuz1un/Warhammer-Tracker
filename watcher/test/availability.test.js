@@ -6,6 +6,8 @@ const {
   normalizeReleaseDate,
   sanitizeUrl,
   normalizeCatalogBook,
+  isAllowedOrigin,
+  redactConfig,
 } = require('../server');
 
 test('detects sold out online variants', () => {
@@ -70,4 +72,23 @@ test('adds richer catalog metadata for release browsing', () => {
   assert.equal(book.format, 'hardback');
   assert.equal(book.url, 'https://www.warhammer.com/en-EU/shop/blackheart-claws-of-the-maelstrom');
   assert.equal(book.availabilityState, 'available');
+});
+
+test('allows only trusted origins through the CORS policy', () => {
+  assert.equal(isAllowedOrigin('http://localhost:8080'), true);
+  assert.equal(isAllowedOrigin('http://127.0.0.1:3000'), true);
+  assert.equal(isAllowedOrigin('https://public.example.com'), false);
+  assert.equal(isAllowedOrigin(undefined), true);
+});
+
+test('redacts secrets before any config is logged', () => {
+  const safe = redactConfig({
+    algoliaKey: 'super-secret-key-123',
+    emailPass: 'password-123',
+    discordWebhook: 'https://discord.com/api/webhooks/example/secret'
+  });
+
+  assert.notEqual(safe.algoliaKey, 'super-secret-key-123');
+  assert.notEqual(safe.emailPass, 'password-123');
+  assert.equal(safe.discordWebhook, 'configured');
 });
