@@ -26,7 +26,7 @@ Este projeto combina:
 - [x] Interface de “New Releases” / “Upcoming”
 - [x] Painel de detalhes do livro
 - [x] Agrupamento por série / autor / leitura
-- [ ] Coleção, wishlist e histórico pessoal
+- [x] Coleção, wishlist e histórico pessoal
 - [ ] Fluxo de reportar livro em falta ou corrigir metadata
 - [ ] Smoke tests finais e validação integrada
 
@@ -89,9 +89,9 @@ Responsabilidades:
 - [x] Ordenação por leitura / cronologia
 
 ### Fase 5 — Coleção e wishlist
-- [ ] Listas pessoais: owned / read / wishlist
-- [ ] Persistência em ficheiro de estado local
-- [ ] Marcação rápida por interface
+- [x] Listas pessoais: owned / read / wishlist
+- [x] Persistência em ficheiro de estado local
+- [x] Marcação rápida por interface
 
 ### Fase 6 — Qualidade e segurança
 - [ ] Revisão de inputs e validação do payload de API

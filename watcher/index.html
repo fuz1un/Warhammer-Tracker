@@ -106,10 +106,14 @@ select:focus{border-color:#c9a84c;outline:none}
 .st.ou{background:rgba(231,76,60,.1);color:#e74c3c;border:1px solid rgba(231,76,60,.22)}
 .st.pr{background:rgba(52,152,219,.1);color:#3498db;border:1px solid rgba(52,152,219,.22)}
 .pr{font-size:13px;font-weight:700;color:#c9a84c}
-.ca{display:flex;gap:6px;margin-top:auto}
+.ca{display:flex;gap:6px;margin-top:auto;flex-wrap:wrap}
 .bs{background:none;border:1px solid rgba(201,168,76,.18);border-radius:4px;padding:5px 9px;color:#6b6358;font-size:11px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:4px;font-family:inherit;font-weight:500}
 .bs:hover{border-color:#c9a84c;color:#c9a84c;background:rgba(201,168,76,.06)}
 .bs.on{border-color:#c9a84c;color:#c9a84c;background:rgba(201,168,76,.1)}
+.collection-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.collection-btn{background:transparent;border:1px solid rgba(201,168,76,.14);border-radius:4px;padding:4px 7px;color:#7d7160;font-size:10px;cursor:pointer;font-family:inherit;transition:all .2s}
+.collection-btn:hover{border-color:rgba(201,168,76,.38);color:#c9a84c}
+.collection-btn.active{background:rgba(201,168,76,.1);border-color:#c9a84c;color:#c9a84c}
 .detail-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);display:none;align-items:center;justify-content:center;z-index:120;padding:24px}
 .detail-panel{width:min(900px,100%);max-height:88vh;overflow:auto;background:#121212;border:1px solid rgba(201,168,76,.22);border-radius:14px;box-shadow:0 24px 60px rgba(0,0,0,.42);padding:0}
 .detail-header{display:flex;justify-content:space-between;align-items:flex-start;padding:18px 20px 14px;border-bottom:1px solid rgba(201,168,76,.12);background:linear-gradient(180deg,rgba(201,168,76,.06),rgba(201,168,76,.02))}
@@ -265,6 +269,12 @@ select:focus{border-color:#c9a84c;outline:none}
       <div id="fs-options"></div>
     </div>
   </div>
+  <select id="collectionFilter" onchange="collectionFilter=this.value; applyFilters();" aria-label="Filtrar coleção">
+    <option value="all">Todas as coleções</option>
+    <option value="owned">Possuídos</option>
+    <option value="read">Lidos</option>
+    <option value="wishlist">Wishlist</option>
+  </select>
   <button class="btn-f" id="bwo" onclick="toggleWatchOnly()" style="display:none">🔔 Só vigiados</button>
   <span class="count" id="cnt"></span>
 </div>
@@ -301,6 +311,8 @@ const BOOK_ATTRIBUTES = ['name','title','productCode','objectID','salePrice','pr
 let books=[], tab='preorder', watchOnly=false, serverOk=false;
 let watched = new Set(JSON.parse(localStorage.getItem('wh_w')||'[]'));
 let watchedBookDetails = [];
+let collectionState = JSON.parse(localStorage.getItem('wh_collection') || '{}');
+let collectionFilter='all';
 let selectedLangs=[];
 let selectedFormats=[];
 let selectedStates=[];
@@ -665,18 +677,55 @@ function matchesStateFilter(book, value){
   return true;
 }
 
-function applyFilters(){
+function getCollectionStatus(id){
+  return collectionState[String(id)] || 'none';
+}
+
+function persistCollection(){
+  localStorage.setItem('wh_collection', JSON.stringify(collectionState));
+}
+
+function renderCollectionButtons(id){
+  const current = getCollectionStatus(id);
+  const options = [
+    { key: 'owned', label: 'Possuído' },
+    { key: 'read', label: 'Lido' },
+    { key: 'wishlist', label: 'Wishlist' }
+  ];
+  return `<div class="collection-row">${options.map(opt => `
+    <button class="collection-btn ${current === opt.key ? 'active' : ''}" onclick="toggleCollectionStatus('${id}', '${opt.key}')">${opt.label}</button>
+  `).join('')}</div>`;
+}
+
+function toggleCollectionStatus(id, status){
+  const normalized = status && status !== 'none' ? status : 'none';
+  if (normalized === 'none') {
+    delete collectionState[String(id)];
+  } else {
+    collectionState[String(id)] = normalized;
+  }
+  persistCollection();
+  applyFilters();
+  render(getVisibleBooks());
+}
+
+function getVisibleBooks(){
   const q=document.getElementById('q').value.toLowerCase();
-  const filtered=books.filter(b=>{
+  return books.filter(b=>{
     if(tab==='preorder'&&!b.preorder) return false;
     if(tab==='watchlist'&&!watched.has(b.id)) return false;
     if(watchOnly&&!watched.has(b.id)) return false;
+    if(collectionFilter !== 'all' && getCollectionStatus(b.id) !== collectionFilter) return false;
     if(q&&!b.title.toLowerCase().includes(q)&&!(b.range||'').toLowerCase().includes(q)) return false;
     if(selectedLangs.length && !selectedLangs.includes(b.lang)) return false;
     if(selectedFormats.length && !selectedFormats.includes(b.format)) return false;
     if(selectedStates.length && !selectedStates.some(state=>matchesStateFilter(b,state))) return false;
     return true;
   });
+}
+
+function applyFilters(){
+  const filtered = getVisibleBooks();
   document.getElementById('cnt').textContent=filtered.length+' livro'+(filtered.length!==1?'s':'');
   render(filtered);
 }
@@ -718,6 +767,7 @@ function buildCardHtml(b){
         <span class="st ${stateClass}" style="border-color:${stateColor};color:${stateColor};background:${stateColor}10">${isReleaseTab ? (b.releaseDate ? '📦 Release' : '🆕 Novo') : statusLabel}</span>
         <span class="pr">${b.price}</span>
       </div>
+      ${renderCollectionButtons(b.id)}
       <div class="ca">
         <button class="bs${isW?' on':''}" onclick="toggleWatch('${b.id}')">
           ${isW?'🔔 A vigiar':'🔕 Vigiar'}
@@ -833,6 +883,7 @@ function openBookDetail(id){
           <span class="detail-tag">${book.price || '—'}</span>
         </div>
         <div class="detail-summary">${summary}</div>
+        ${renderCollectionButtons(book.id)}
         <div class="detail-actions">
           <button class="bs${watched.has(book.id) ? ' on' : ''}" onclick="toggleWatch('${book.id}')">${watched.has(book.id) ? '🔔 A vigiar' : '🔕 Vigiar'}</button>
           ${watched.has(book.id) ? `<button class="bs" onclick="openHistory('${book.id}')">📜 Hist.</button>` : ''}
