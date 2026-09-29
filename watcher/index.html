@@ -88,6 +88,12 @@ select:focus{border-color:#c9a84c;outline:none}
 .series-name{font-size:14px;font-weight:700;color:#f1e7d2}
 .series-meta{font-size:10px;color:#7d7160;text-transform:uppercase;letter-spacing:.08em}
 .series-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.author-groups,.month-groups{padding:16px 24px;display:flex;flex-direction:column;gap:16px}
+.author-group,.month-group{background:#141414;border:1px solid rgba(201,168,76,.12);border-radius:10px;padding:14px 14px 10px}
+.author-header,.month-header{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid rgba(201,168,76,.08)}
+.author-name,.month-name{font-size:14px;font-weight:700;color:#f1e7d2}
+.author-meta,.month-meta{font-size:10px;color:#7d7160;text-transform:uppercase;letter-spacing:.08em}
+.author-grid,.month-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
 .card{background:#1a1a1a;border:1px solid rgba(201,168,76,.14);border-radius:8px;overflow:hidden;transition:border-color .2s,transform .15s;position:relative;display:flex;flex-direction:column}
 .card:hover{border-color:rgba(201,168,76,.32);transform:translateY(-2px)}
 .card.w{border-color:rgba(201,168,76,.38)}
@@ -220,6 +226,10 @@ select:focus{border-color:#c9a84c;outline:none}
   <button class="tab" id="tab-series" onclick="switchTab('series')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/><path d="M18 18h2v2h-2z"/></svg>
     Séries
+  </button>
+  <button class="tab" id="tab-authors" onclick="switchTab('authors')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 19a4 4 0 0 0-8 0"/><circle cx="12" cy="7" r="4"/><path d="M20 19a4 4 0 0 0-2.5-3.6"/><path d="M4 19a4 4 0 0 1 2.5-3.6"/></svg>
+    Autores
   </button>
   <button class="tab" id="tab-all" onclick="switchTab('all')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
@@ -842,6 +852,37 @@ function groupBooksBySeries(items){
   return [...groups.entries()].sort(([a],[b]) => a.localeCompare(b));
 }
 
+function groupBooksByAuthor(items){
+  const groups = new Map();
+  const safeItems = [...items].sort((a,b)=>
+    String(a.title).localeCompare(String(b.title))
+  );
+
+  for (const book of safeItems) {
+    const key = (book.author || 'Sem autor').trim() || 'Sem autor';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(book);
+  }
+  return [...groups.entries()].sort(([a],[b]) => a.localeCompare(b));
+}
+
+function groupBooksByMonth(items){
+  const groups = new Map();
+  const safeItems = [...items].sort((a,b)=>{
+    const aDate = a.releaseDate || '9999-12-31';
+    const bDate = b.releaseDate || '9999-12-31';
+    return String(aDate).localeCompare(String(bDate)) || String(a.title).localeCompare(String(b.title));
+  });
+
+  for (const book of safeItems) {
+    const monthKey = book.releaseDate ? book.releaseDate.slice(0,7) : 'Sem data';
+    const label = monthKey === 'Sem data' ? 'Sem data' : new Date(`${monthKey}-01T00:00:00`).toLocaleDateString('pt-PT', { month: 'long', year: 'numeric' });
+    if (!groups.has(monthKey)) groups.set(monthKey, []);
+    groups.get(monthKey).push(book);
+  }
+  return [...groups.entries()].sort(([a],[b]) => a.localeCompare(b));
+}
+
 function render(list){
   const el=document.getElementById('content');
   if(!list.length){
@@ -864,6 +905,34 @@ function render(list){
           <div class="series-meta">${items.length} título${items.length !== 1 ? 's' : ''}</div>
         </div>
         <div class="series-grid">${items.map(buildCardHtml).join('')}</div>
+      </div>
+    `).join('') + '</div>';
+    return;
+  }
+
+  if(tab === 'authors'){
+    const groups = groupBooksByAuthor(list);
+    el.innerHTML = '<div class="author-groups">' + groups.map(([authorName, items]) => `
+      <div class="author-group">
+        <div class="author-header">
+          <div class="author-name">${authorName}</div>
+          <div class="author-meta">${items.length} título${items.length !== 1 ? 's' : ''}</div>
+        </div>
+        <div class="author-grid">${items.map(buildCardHtml).join('')}</div>
+      </div>
+    `).join('') + '</div>';
+    return;
+  }
+
+  if(tab === 'releases'){
+    const groups = groupBooksByMonth(list.filter(item => item.releaseDate || item.releaseDate === null));
+    el.innerHTML = '<div class="month-groups">' + groups.map(([monthKey, items]) => `
+      <div class="month-group">
+        <div class="month-header">
+          <div class="month-name">${monthKey === 'Sem data' ? 'Sem data' : new Date(`${monthKey}-01T00:00:00`).toLocaleDateString('pt-PT', { month: 'long', year: 'numeric' })}</div>
+          <div class="month-meta">${items.length} título${items.length !== 1 ? 's' : ''}</div>
+        </div>
+        <div class="month-grid">${items.map(buildCardHtml).join('')}</div>
       </div>
     `).join('') + '</div>';
     return;

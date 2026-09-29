@@ -73,7 +73,7 @@ Responsabilidades:
 - [x] Criar tab “New releases”
 - [ ] Criar tab “Upcoming”
 - [x] Ordenar por data e mostrar próximos lançamentos
-- [ ] Mostrar meses / grupos por data de lançamento
+- [x] Mostrar meses / grupos por data de lançamento
 - [ ] Adicionar paginação ou carregamento incremental
 
 ### Fase 3 — Detalhes do livro
@@ -84,8 +84,8 @@ Responsabilidades:
 
 ### Fase 4 — Séries e leitura
 - [x] Agrupar por `series`
-- [ ] Página por série
-- [ ] Página por autor
+- [x] Página por série
+- [x] Página por autor
 - [x] Ordenação por leitura / cronologia
 
 ### Fase 5 — Coleção e wishlist
