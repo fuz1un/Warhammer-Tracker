@@ -51,9 +51,15 @@ function loadConfig() {
 
 let CONFIG = loadConfig();
 console.log('ALGOLIA APP:', CONFIG.algoliaApp);
-console.log('ALGOLIA KEY:', CONFIG.algoliaKey);
+console.log('ALGOLIA KEY:', maskSecret(CONFIG.algoliaKey));
 console.log('ALGOLIA IDX:', CONFIG.algoliaIdx);
-console.log('Config:', { discordEnabled: CONFIG.discordEnabled, discordWebhook: CONFIG.discordWebhook, emailEnabled: CONFIG.emailEnabled, emailTo: CONFIG.emailTo, dataFile: CONFIG.dataFile });
+console.log('Config:', {
+  discordEnabled: CONFIG.discordEnabled,
+  discordWebhook: CONFIG.discordWebhook ? 'configured' : 'not-set',
+  emailEnabled: CONFIG.emailEnabled,
+  emailTo: CONFIG.emailTo ? maskEmail(CONFIG.emailTo) : '',
+  dataFile: CONFIG.dataFile,
+});
 
 // ─── STATE ──────────────────────────────────────────────
 let state = { watched: [], lastStatus: {}, lastSeen: {}, history: {} };
@@ -302,6 +308,88 @@ function normalizeUrl(path) {
   return `https://www.warhammer.com/en-EU/shop/${clean}`;
 }
 
+function maskSecret(value) {
+  if (!value) return 'not-set';
+  const text = String(value).trim();
+  if (text.length <= 6) return '***';
+  return `${text.slice(0, 3)}...${text.slice(-3)}`;
+}
+
+function maskEmail(value) {
+  if (!value) return '';
+  const text = String(value).trim();
+  if (text.length <= 3) return text;
+  const [local, domain] = text.split('@');
+  if (!domain) return `${text.slice(0, 2)}***`;
+  return `${local.slice(0, 2)}***@${domain}`;
+}
+
+function sanitizeText(value) {
+  return rawText(value).replace(/[\u0000-\u001F\u007F]/g, '').trim();
+}
+
+function sanitizeUrl(value) {
+  const raw = sanitizeText(value);
+  if (!raw) return null;
+  const lower = raw.toLowerCase();
+  if (lower.startsWith('javascript:') || lower.startsWith('data:') || lower.startsWith('vbscript:')) return null;
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  if (raw.startsWith('//')) return `https:${raw}`;
+  if (raw.startsWith('/')) return `https://www.warhammer.com${raw.startsWith('/') ? raw : `/${raw}`}`;
+  return `https://www.warhammer.com/${raw.replace(/^\/+/, '')}`;
+}
+
+function normalizeReleaseDate(value) {
+  const text = sanitizeText(value);
+  if (!text || /^(tba|not yet released|coming soon|upcoming|unknown)$/i.test(text)) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  if (/^\d{4}$/.test(text)) return text;
+
+  const monthMap = {
+    jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+    jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
+  };
+
+  const matchDayMonthYear = text.match(/^(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\.?\s+(\d{4})$/i);
+  if (matchDayMonthYear) {
+    const [, day, month, year] = matchDayMonthYear;
+    return `${year}-${monthMap[month.toLowerCase()]}-${String(day).padStart(2, '0')}`;
+  }
+
+  const matchMonthYear = text.match(/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\.?\s+(\d{4})$/i);
+  if (matchMonthYear) {
+    const [, month, year] = matchMonthYear;
+    return `${year}-${monthMap[month.toLowerCase()]}`;
+  }
+
+  const matchYearOnly = text.match(/^(\d{4})/);
+  if (matchYearOnly) return matchYearOnly[1];
+
+  return null;
+}
+
+function normalizeCatalogBook(h = {}) {
+  const title = sanitizeText(h.title || h.name || 'Untitled');
+  const author = sanitizeText(h.author || h.writer || h.by || h.authors?.[0]);
+  const series = sanitizeText(h.series || h.range || h.collection);
+  const releaseDate = normalizeReleaseDate(h.releaseDate || h.firstPublished || h.published || h.date || h.release || h['release-date']);
+  const safeUrl = sanitizeUrl(pickFirst(h.url, h.slug, h.productUrl, h.canonicalUrl, h.path));
+  const format = normalizeFormat(pickFirst(h.format, h.bookFormat, h.productFormat), title, safeUrl || '');
+  const slug = sanitizeText(h.slug || cleanKey(title).replace(/\s+/g, '-')) || 'untitled-book';
+
+  return {
+    author: author || null,
+    series: series || null,
+    slug,
+    releaseDate,
+    releaseYear: releaseDate ? String(releaseDate).slice(0, 4) : null,
+    format: format || 'unknown',
+    url: safeUrl,
+    summary: sanitizeText(h.summary || h.description || h.synopsis) || null,
+    isbn: sanitizeText(h.isbn || h.isbn13 || h.isbn_13) || null,
+  };
+}
+
 function normalizeBook(h) {
   const availabilityState = normalizeAvailabilityState(h);
   const preorder = availabilityState.key === 'preorder';
@@ -310,6 +398,16 @@ function normalizeBook(h) {
   const title = h.name || h.title || '—';
   const url = pickFirst(h.url, h.slug, h.productUrl, h.canonicalUrl, h.path);
   const format = normalizeFormat(pickFirst(h.format, h.bookFormat, h.productFormat), title, url);
+  const catalogMeta = normalizeCatalogBook({
+    ...h,
+    title,
+    name: title,
+    author: h.author || h.writer || h.by || h.authors?.[0],
+    range: h.range || h.series || h.collection,
+    releaseDate: h.releaseDate || h.firstPublished || h.published || h.date || h.release || h['release-date'],
+    format,
+    url,
+  });
   return {
     id:                  h.productCode || h.objectID,
     title,
@@ -320,12 +418,19 @@ function normalizeBook(h) {
     avail:               available,
     preorder,
     image:               normalizeImage(h),
-    url:                 normalizeUrl(url),
+    url:                 sanitizeUrl(url),
     range:               h.range || null,
     availabilityState:   availabilityState.key,
     availabilityLabel:   availabilityState.label,
     availabilityColor:   availabilityState.color,
     availabilityMessage: availabilityState.message,
+    author:              catalogMeta.author,
+    series:              catalogMeta.series,
+    slug:                catalogMeta.slug,
+    releaseDate:         catalogMeta.releaseDate,
+    releaseYear:         catalogMeta.releaseYear,
+    summary:             catalogMeta.summary,
+    isbn:                catalogMeta.isbn,
   };
 }
 
@@ -354,6 +459,34 @@ async function fetchBooks(tab) {
 
   if (!books.length) throw new Error('Sem hits');
   return books;
+}
+
+function buildReleaseSummary(books = []) {
+  const normalized = books
+    .map(book => normalizeCatalogBook(book))
+    .filter(book => book.releaseDate || book.series || book.author || book.slug);
+
+  const byMonth = {};
+  for (const book of normalized) {
+    if (!book.releaseDate) continue;
+    const monthKey = book.releaseDate.length > 7 ? book.releaseDate.slice(0, 7) : book.releaseDate;
+    byMonth[monthKey] = byMonth[monthKey] || [];
+    byMonth[monthKey].push(book);
+  }
+
+  const sortedMonths = Object.entries(byMonth).sort(([a], [b]) => a.localeCompare(b));
+  const recent = [...normalized]
+    .filter(book => book.releaseDate)
+    .sort((a, b) => String(a.releaseDate).localeCompare(String(b.releaseDate)))
+    .slice(0, 12);
+
+  return {
+    generatedAt: new Date().toISOString(),
+    total: normalized.length,
+    upcoming: normalized.filter(book => !book.releaseDate).slice(0, 20),
+    recent,
+    byMonth: Object.fromEntries(sortedMonths),
+  };
 }
 
 // ─── NOTIFICAÇÕES ───────────────────────────────────────
@@ -612,6 +745,27 @@ const server = http.createServer(async (req, res) => {
     } catch(e) { return json(res, 500, { error: e.message }); }
   }
 
+  if (url.pathname === '/catalog' && req.method === 'GET') {
+    try {
+      const tab = url.searchParams.get('tab') || 'all';
+      const hits = latestCatalog.all.length ? latestCatalog.all : await fetchBooks(tab);
+      latestCatalog.all = hits;
+      return json(res, 200, {
+        hits,
+        total: hits.length,
+        generatedAt: new Date().toISOString(),
+      });
+    } catch(e) { return json(res, 500, { error: e.message }); }
+  }
+
+  if (url.pathname === '/releases' && req.method === 'GET') {
+    try {
+      const books = latestCatalog.all.length ? latestCatalog.all : await fetchBooks('all');
+      latestCatalog.all = books;
+      return json(res, 200, buildReleaseSummary(books));
+    } catch(e) { return json(res, 500, { error: e.message }); }
+  }
+
   if (url.pathname === '/watched') {
     if (req.method === 'GET') {
       return json(res, 200, { watched: state.watched, lastStatus: state.lastStatus, lastSeen: state.lastSeen });
@@ -670,4 +824,7 @@ if (require.main === module) {
 module.exports = {
   normalizeAvailabilityState,
   getTransitionMessage,
+  normalizeReleaseDate,
+  sanitizeUrl,
+  normalizeCatalogBook,
 };
