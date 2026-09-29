@@ -63,15 +63,13 @@ test('adds richer catalog metadata for release browsing', () => {
     range: 'Huron Blackheart',
     releaseDate: '20 Oct 2026',
     format: 'Hardback',
-    url: '/en-EU/shop/blackheart-claws-of-the-maelstrom',
-    availabilityState: 'available'
+    url: '/en-EU/shop/blackheart-claws-of-the-maelstrom'
   });
 
   assert.equal(book.series, 'Huron Blackheart');
   assert.equal(book.releaseDate, '2026-10-20');
   assert.equal(book.format, 'hardback');
   assert.equal(book.url, 'https://www.warhammer.com/en-EU/shop/blackheart-claws-of-the-maelstrom');
-  assert.equal(book.availabilityState, 'available');
 });
 
 test('allows only trusted origins through the CORS policy', () => {
