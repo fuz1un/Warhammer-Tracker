@@ -1,80 +1,123 @@
-# ⚙ WH40K — Biblioteca Imperial
+# ⚙ WH40K — Imperial Library
 
-Rastreador de livros Black Library com alertas de stock por email e Discord.
+A catalog and stock tracker for Black Library titles, built around real availability data, curated metadata, and future multi-user product workflows.
 
-Este projeto combina:
-- monitorização de stock e pré-encomendas
-- catálogo de livros
-- novas edições e releases
-- lista de acompanhamento (watchlist)
-- futuro suporte para coleção, séries e leitura
+This project combines:
+- stock and preorder monitoring
+- release and news tracking
+- product catalog enrichment
+- author and series views
+- watchlist and collection tracking
+- a long-term path toward a true editorial + community platform
 
-## Estado do projeto
+## Project goal
 
-### Milestones concluídos
-- [x] Estrutura base do servidor em Node.js
-- [x] Serviço de frontend estático em `/`
-- [x] API de livros e estado de stock
-- [x] Watcher de livros vigiados com notificações por email e Discord
-- [x] Normalização de disponibilidade e transições de estado
-- [x] Melhoria da camada de catálogo com metadata mais rica
-- [x] Endpoints de catálogo e releases (`/catalog`, `/releases`)
-- [x] Sanitização de URLs e mascaramento de segredos em logs
-- [x] Testes iniciais para estados de stock e normalização
+The long-term ambition is not simply to track whether a book is in stock.
+The goal is to become the reference platform for Warhammer books:
+- official availability when it exists
+- secondary-market visibility when it does not
+- clean bibliographic metadata
+- reading order and series context
+- personal tracking for users
+- later-stage purchase assistance for watched titles
 
-### Milestones em progresso
-- [x] Interface de “New Releases” / “Upcoming”
-- [x] Painel de detalhes do livro
-- [x] Agrupamento por série / autor / leitura
-- [x] Coleção, wishlist e histórico pessoal
-- [x] Fluxo de reportar livro em falta ou corrigir metadata
-- [x] Hardening de configuração e CORS para uso local/seguro
-- [ ] Smoke tests finais e validação integrada
+In short, we want to become the best source for information, discovery, and restock tracking around Warhammer books, while preserving trust in the source data.
 
 ---
 
-## Visão geral da arquitectura
+## Current state
+
+### Completed milestones
+- [x] Node.js server foundation
+- [x] Static frontend served from `/`
+- [x] Books and stock API
+- [x] Watcher with email and Discord notifications
+- [x] Availability normalization and state transitions
+- [x] Richer catalog metadata layer
+- [x] Catalog and release endpoints
+- [x] URL sanitization and secret masking in logs
+- [x] Regression tests for stock and normalization logic
+
+### In progress / delivered lately
+- [x] New Releases / upcoming browsing experience
+- [x] Book detail panel
+- [x] Series / author / reading groupings
+- [x] Collection, wishlist and personal history flows
+- [x] Correction reporting for missing or wrong metadata
+- [x] Hardened configuration and safer local setup
+- [ ] Final smoke tests and integrated validation
+
+---
+
+## Product vision and strategic direction
+
+This project is currently a strong tracker for official stock and catalog signals, but the true end-state is a larger editorial and community product.
+
+The core idea is:
+- Official Black Library data remains the source of truth for active stock, price and preorder status.
+- Older or sold-out titles are treated as historical / secondary-market inventory, not as if they were still available on the official shop.
+- Curated metadata is layered on top of official data to improve discovery, bibliographic context, and author/series coverage.
+- User features come later, once the data and product foundations are stable.
+
+This is important because the older books are no longer necessarily available on the official site, while Grimdark Archive and similar sites rely on reseller availability and broader catalog aggregation.
+That means the right model is not “everything is official” but “everything has a source and a trust layer.”
+
+---
+
+## Architecture overview
 
 ### Backend
-Localização principal:
+Main file:
 - `watcher/server.js`
 
-Responsabilidades:
-- servir o frontend
-- consultar Algolia para os livros
-- normalizar estado de stock
-- detectar transições de disponibilidade
-- enviar emails e Discord
-- guardar estado local em `data/state.json`
-- fornecer endpoints de catálogo e releases
+Responsibilities:
+- serve the frontend
+- query Algolia for Black Library product data
+- normalize availability states
+- detect stock transitions
+- dispatch email and Discord notifications
+- store local watcher state
+- expose catalog and release endpoints
 
 ### Frontend
-Localização principal:
+Main file:
 - `watcher/index.html`
 
-Responsabilidades:
-- mostrar todos os livros
-- mostrar pré-encomendas
-- mostrar novidades assinaladas pela loja
-- mostrar livros vigiados
-- filtros por idioma, formato, estado e pesquisa
-- detalhes, séries, autores e biblioteca pessoal
+Responsibilities:
+- browse current books and preorders
+- view releases and new titles
+- show watched items and collection state
+- filter by language, format, state and search
+- detail pages and grouped browsing by series / authors
 
-## Proveniência e limites dos dados
+---
 
-A app consulta o índice Algolia público da loja Black Library através do backend. A origem atual fornece título, preço, disponibilidade, pré-encomenda, autor, série, formato, género, descrição, imagem, slug e o indicador de novidade `isNewRelease`.
+## Data provenance and constraints
 
-O campo `series` reproduz a categoria do catálogo da loja; pode ser amplo (por exemplo, “Warhammer 40,000”) e não representa necessariamente uma série narrativa ou uma ordem de leitura. A fonte atual não fornece datas de publicação, ISBN, ratings, metadados de audiobook, facções ou ordens de leitura editoriais. Por isso, “Novidades” usa o indicador da loja, não uma cronologia completa.
+The app queries the public Black Library Algolia index through the backend. The current source provides title, price, availability, preorder status, author, series, format, genre, description, image, slug and the `isNewRelease` flag.
 
-O Grimdark Archive declara combinar dados da Hardcover com enriquecimento de Wikipedia, Google Books e Track of Words, além de ratings agregados e capas de várias origens. A nossa app não importa dados desse site nem reproduz ratings, sinopses ou ordens editoriais de terceiros.
+That is strong for modern store activity, but it does not fully cover editorial metadata like publication date, ISBNs, audiobook metadata, faction-specific ordering, or reading order guidance. That is why the “New Releases” section is useful for official novelty tracking, but not a full editorial chronology.
 
-Uma verificação pontual de três títulos encontrou `Horus Rising` na Open Library, mas como uma obra com 24 ISBNs/edições; `Blackheart: Claws of the Maelstrom` e `Master of Rites` não foram encontrados. A Open Library diz que a API não se destina a servir de backend de catálogo e recomenda tráfego baixo e identificado. A Google Books API exige uma chave para dados públicos; uma chamada de teste sem chave foi limitada por quota (`429`). Não ativamos nenhuma destas integrações automáticas. A API GraphQL da Hardcover também exige token; Track of Words é tratado como fonte editorial para consulta e links, não como API de catálogo.
+We intentionally avoid pretending that a third-party catalog is the same as the official store source. A useful product needs source clarity:
+- official source
+- reseller source
+- curated override
+- historical record
+- community report
 
-### Complementos verificados
+This gives us a real trust model, which is essential for a product that aims to be useful beyond a simple watcher.
 
-Para preencher campos ausentes sem alterar dados comerciais da loja, usa `watcher/catalog-overrides.json`, indexado pelo ID estável do produto. Cada campo aceite (`authors`, `series`, `releaseDate`, `isbn`) exige `value`, `sourceUrl` HTTPS e `verifiedAt` no formato `AAAA-MM-DD`. Os valores e a fonte aprovada aparecem no detalhe do livro; overrides inválidos são ignorados. Reinicia o servidor após editar o ficheiro.
+### Verified metadata overrides
 
-O primeiro lote contém quatro autores confirmados nas páginas oficiais da edição: Gav Thorpe (*The First Wall*), Mike Brooks (*Brutal Kunnin*), John French (*Slaves to Darkness*) e Ben Counter (*Galaxy in Flames*). Outros registos sem autor continuam em branco enquanto a página da edição não confirmar o crédito.
+To fill missing fields without altering official sales data, the project uses `watcher/catalog-overrides.json`, keyed by stable product ID. Accepted fields are `authors`, `series`, `releaseDate`, and `isbn`.
+Each override requires:
+- `value`
+- `sourceUrl` using HTTPS
+- `verifiedAt` in `YYYY-MM-DD` format
+
+Invalid overrides are ignored. The server reloads the file after changes.
+
+Example:
 
 ```json
 {
@@ -91,102 +134,189 @@ O primeiro lote contém quatro autores confirmados nas páginas oficiais da edi�
 }
 ```
 
-Os estados Possuído, Lido, Wishlist e reports ficam no `localStorage` deste browser. A watchlist também é sincronizada com o estado local do servidor. Não existe sincronização na cloud nem analytics.
+This is intentionally conservative and should remain conservative. We do not guess missing authors or series from weak signals.
 
 ---
 
-## TODO / Roadmap
+## Product roadmap
 
-### Fase 1 — Base do catálogo
-- [x] Definir modelo de dados do catálogo
-- [x] Adicionar metadata rica ao modelo de livro
-- [x] Adicionar endpoints de catálogo e releases
-- [x] Sanitizar URLs e proteger logs
-- [ ] Expor filtros mais ricos no frontend (`series`, `author`, `releaseDate`, etc.)
+### Phase 1 — source-of-truth and stock tracking
+- [x] define the data model for the catalog
+- [x] add richer metadata to the book model
+- [x] add catalog and releases endpoints
+- [x] sanitize URLs and harden logs
+- [x] implement watched collections and notifications
+- [ ] richer filtering in the frontend
 
-### Fase 2 — Releases e descoberta
-- [x] Criar tab “New releases”
-- [ ] Criar tab “Upcoming”
-- [x] Ordenar por data e mostrar próximos lançamentos
-- [x] Mostrar meses / grupos por data de lançamento
-- [ ] Adicionar paginação ou carregamento incremental
+### Phase 2 — release discovery and editorial browsing
+- [x] new releases tab
+- [ ] upcoming / future release tab
+- [x] order by date and show release groups
+- [x] month-based grouping for release browsing
+- [ ] pagination or incremental loading
 
-### Fase 3 — Detalhes do livro
-- [x] Criar painel modal/side panel para cada livro
-- [x] Mostrar resumo, autor, série, formato, data de lançamento
-- [x] Mostrar relação com autores e séries
-- [ ] Mostrar histórico de disponibilidade do livro
+### Phase 3 — product details and provenance
+- [x] book detail panel
+- [x] show summary, author, series, format and release date
+- [x] show inferred relations between authors and series
+- [ ] show stock history by source
+- [ ] show provenance badges clearly
 
-### Fase 4 — Séries e leitura
-- [x] Agrupar por `series`
-- [x] Página por série
-- [x] Página por autor
-- [x] Ordenação por leitura / cronologia
+### Phase 4 — series and reading flow
+- [x] grouping by series
+- [x] author views
+- [x] reading-order style organization
+- [ ] true series detail pages with chronology and publication order
 
-### Fase 5 — Coleção e wishlist
-- [x] Listas pessoais: owned / read / wishlist
-- [x] Persistência em ficheiro de estado local
-- [x] Marcação rápida por interface
-- [x] Vista “Minha biblioteca” com contador e filtro de estados pessoais
+### Phase 5 — personal library and tracking
+- [x] owned / read / wishlist states
+- [x] local persistence
+- [x] personal library dashboard
+- [x] quick marking within the interface
 
-### Fase 6 — Qualidade e segurança
-- [x] Revisão de inputs e validação do payload de API
-- [x] Melhor tratamento de erros e fallbacks
-- [x] Proteção adicional para acesso futuro global
-- [x] Limitar exposição de dados sensíveis em logs e respostas
-- [x] Revisão de CORS e headers HTTP em cenário global
-- [x] Configuração segura por ambiente/local e ignorar ficheiros sensíveis no Git
-- [x] Fluxo local de reportar livros com metadata em falta ou incorreta
+### Phase 6 — quality, safety and scaling
+- [x] input validation and API hardening
+- [x] safer fallbacks and error handling
+- [x] security-minded configuration structure
+- [x] log sanitization and safe output
+- [x] local report flow for missing or incorrect metadata
 
-### Fase 7 — Operações e manutenção
-- [ ] Testes de regressão para stock e release metadata
-- [ ] Validação de endpoints com smoke tests
-- [ ] Documentação de deploy e configuration
-- [ ] Preparação para multi-tenant / uso global
+### Phase 7 — user accounts and multi-user platform
+- [ ] auth and user sessions
+- [ ] multi-user watchlists and collection states
+- [ ] profile settings and notification preferences
+- [ ] user history and personal dashboards
 
----
-
-## Regras de desenvolvimento
-
-### Segurança
-- Nunca logar secrets e API keys em texto plano
-- Usar mascaramento para valores sensíveis
-- Validar todas as URLs externas antes de as usar
-- Evitar `javascript:` / `data:` / `vbscript:` em links
-- Manter configurações locais e sensíveis fora do frontend
-- Usar allowlist de origens e headers de segurança básicos para qualquer futuro uso público
-
-### Boas práticas
-- Fazer mudanças pequenas e verificáveis
-- Adicionar testes para regressões em regras de negócio
-- Manter watcher e catálogo separados logicamente
-- Priorizar compatibilidade com o uso pessoal antes de abrir ao público
+### Phase 8 — purchase assistance and automation
+- [ ] connect the user’s Black Library account or equivalent purchase flow
+- [ ] build purchase-intent tracking for watched books
+- [ ] notify when watched items restock
+- [ ] support checkout assistance with a human confirmation step
 
 ---
 
-## Como verificar o estado local
+## UX / UI roadmap
+
+The product is already working as a tracker, but the UI still sits in the “functional prototype” layer. That is fine for the first version, but we need to evolve it intentionally.
+
+### UX phase 1 — clarity and trust
+- improve card information hierarchy
+- show source clearly on every book
+- distinguish official vs secondary-market availability
+- display clear labels such as “official”, “historical”, “reseller”, “curated metadata”
+
+### UX phase 2 — browsing quality
+- cleaner filters and search behaviour
+- release calendar and upcoming views
+- better groupings by series, author and month
+- stronger mobile responsiveness
+
+### UX phase 3 — editorial product feel
+- dedicated pages for authors and series
+- publication chronology and reading order
+- visual identity aligned with the Warhammer aesthetic without feeling cluttered
+- richer book details with provenance and editorial context
+
+### UX phase 4 — user platform experience
+- sign-in flow
+- user dashboards
+- custom watchlists and collections
+- saved preferences and alerts
+- profile management and growth loops
+
+This part is continuous. We do not wait to finish the entire platform before improving the product experience. We iterate in small waves and keep the usability improving as the product grows.
+
+---
+
+## Should we keep using only HTML?
+
+Short answer: not for the final product.
+
+### What HTML/CSS/JS is good for
+- very fast prototypes
+- single-page catalog views
+- internal tools
+- early experimentation
+- low-friction validation of the core logic
+
+That is exactly what this project already is: an efficient proof of concept with working functionality.
+
+### What it is not good for long-term
+- multi-user auth
+- complex state management
+- a richer product UX with many views
+- maintainable component architecture
+- clean separation between frontend and backend concerns
+- future scaling and collaboration
+
+### Recommended direction
+Keep the current HTML/CSS/JS version as a prototype and foundation, but evolve toward a modern frontend stack once the product pain points become clear.
+
+A sensible next step is:
+- Keep the Node backend
+- Move the frontend to a framework such as React or Vue via Vite
+- Use a clean API contract between frontend and backend
+- Keep the data and business logic in the backend, not in the browser
+
+This gives us the best of both worlds:
+- we keep the speed of iteration
+- we get maintainability and product quality
+- we avoid becoming stuck in a single-file UI model forever
+
+For a personal project and portfolio piece, a hybrid path is ideal:
+- prototype in plain HTML to validate the concept quickly
+- then modernize the frontend once the architecture is proven
+
+That is the right path for this project and for a CV-worthy product story.
+
+---
+
+## Development rules
+
+### Security
+- never log secrets or API keys in plain text
+- mask sensitive values in logs
+- validate all external URLs before use
+- reject unsafe links like `javascript:` / `data:` / `vbscript:`
+- keep local secrets outside the frontend
+- apply strict origin and header controls for future public exposure
+
+### Good practices
+- keep changes small and verifiable
+- add regression tests for business logic
+- separate watch logic from catalog logic
+- prioritize personal use and reliability before large public exposure
+- keep source provenance explicit at every layer
+
+---
+
+## Local verification
 
 ```bash
-# No diretório do projeto
+# from the project root
 node --test watcher/test/availability.test.js
 ```
 
-Se o ambiente tiver Node disponível, este comando deve validar as regras de normalização e transição de estado.
+This validates the core normalization and stock-state logic.
 
 ---
 
-## Commits úteis
+## Useful commit messages
 
-Mensagem curta e precisa usada habitualmente:
 - `feat: add catalog metadata and release endpoints`
 - `fix: sanitize urls and mask secrets in logs`
 - `chore: update roadmap and milestones`
 
 ---
 
-## Próximo passo recomendado
+## Recommended next step
 
-Implementar a interface de “New Releases / Upcoming” e depois o painel de detalhes do livro, mantendo a lógica de watchlist intacta.
+Implement the next major product iteration by focusing on:
+1. clear source labeling for official vs secondary-market data
+2. better UX for search, filters and detail views
+3. author / series pages with rich editorial context
+4. user authentication and multi-user tracking
+5. then purchase-assistance flows after the foundation is stable
 
 ## Quick setup
 
@@ -218,6 +348,11 @@ docker compose up -d
 4. Open `http://localhost:8080`
 
 ## How to get a Gmail App Password
+
+Follow Google’s App Password flow in the account settings and generate an app-specific password for SMTP use.
+
+This project is intentionally being built as a strong base for a real product story: a catalog and tracker with trustable data, clear provenance, and a roadmap toward a multi-user editorial platform.
+
 
 1. Go to [myaccount.google.com](https://myaccount.google.com)
 2. Security → 2-Step Verification (enable it if it isn't already)

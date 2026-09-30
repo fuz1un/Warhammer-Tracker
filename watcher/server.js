@@ -46,7 +46,7 @@ function loadConfig() {
     discordEnabled: process.env.DISCORD_ENABLED === 'true' || file.discordEnabled || false,
     discordWebhook: process.env.DISCORD_WEBHOOK || file.discordWebhook || '',
 
-    allowedOrigins: process.env.ALLOWED_ORIGINS || file.allowedOrigins || 'http://localhost:8080,http://localhost:3000,http://127.0.0.1:8080,http://127.0.0.1:3000',
+    allowedOrigins: process.env.ALLOWED_ORIGINS || file.allowedOrigins || 'http://localhost:8080,http://localhost:3000,http://localhost:5173,http://127.0.0.1:8080,http://127.0.0.1:3000,http://127.0.0.1:5173',
 
     dataFile: resolveDataFile(process.env.DATA_FILE || file.dataFile),
   };
@@ -866,7 +866,9 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('Referrer-Policy', 'no-referrer');
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
-  const url = new URL(req.url, `http://localhost:${CONFIG.port}`);
+  const rawUrl = new URL(req.url, `http://localhost:${CONFIG.port}`);
+  const url = new URL(rawUrl.pathname.startsWith('/api') ? rawUrl.pathname.replace(/^\/api/, '') || '/' : rawUrl.pathname, `http://localhost:${CONFIG.port}`);
+  const searchParams = rawUrl.searchParams;
 
   // ── Frontend ──
   if (url.pathname === '/' || url.pathname === '/index.html') {
@@ -893,7 +895,7 @@ const server = http.createServer(async (req, res) => {
 
   if (url.pathname === '/books' && req.method === 'GET') {
     try {
-      const tab = url.searchParams.get('tab') || 'all';
+      const tab = searchParams.get('tab') || 'all';
       const cached = tab === 'preorder' ? latestCatalog.preorder : latestCatalog.all;
       const hits = cached.length ? cached : await fetchBooks(tab);
       if (tab === 'preorder') latestCatalog.preorder = hits; else latestCatalog.all = hits;
@@ -903,7 +905,7 @@ const server = http.createServer(async (req, res) => {
 
   if (url.pathname === '/catalog' && req.method === 'GET') {
     try {
-      const tab = url.searchParams.get('tab') || 'all';
+      const tab = searchParams.get('tab') || 'all';
       const hits = latestCatalog.all.length ? latestCatalog.all : await fetchBooks(tab);
       latestCatalog.all = hits;
       return json(res, 200, {
