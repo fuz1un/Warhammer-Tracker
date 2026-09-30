@@ -142,6 +142,7 @@ select:focus{border-color:#c9a84c;outline:none}
 .detail-meta{display:flex;flex-wrap:wrap;gap:6px}
 .detail-tag{padding:4px 8px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid rgba(201,168,76,.12);font-size:10px;color:#baab8b;text-transform:uppercase;letter-spacing:.06em}
 .detail-summary{font-size:13px;line-height:1.7;color:#a79c89}
+.detail-source{font-size:11px;line-height:1.5;color:#6b6358}
 .detail-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
 .detail-section{margin-top:8px;padding-top:10px;border-top:1px solid rgba(201,168,76,.08)}
 .detail-section h3{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#8a7f6e;margin-bottom:8px}
@@ -1070,6 +1071,7 @@ function openBookDetail(id){
           <span class="detail-tag">${book.price || '—'}</span>
         </div>
         <div class="detail-summary">${escapeHtml(summary)}</div>
+        <div class="detail-source">Catálogo e descrição: loja Black Library. A categoria “Série” pode não corresponder à ordem de leitura.</div>
         ${renderCollectionButtons(book.id)}
         <div class="detail-actions">
           <button class="bs${watched.has(book.id) ? ' on' : ''}" onclick="toggleWatch('${book.id}')">${watched.has(book.id) ? '🔔 A vigiar' : '🔕 Vigiar'}</button>

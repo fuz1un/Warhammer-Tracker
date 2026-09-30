@@ -55,9 +55,20 @@ Localização principal:
 Responsabilidades:
 - mostrar todos os livros
 - mostrar pré-encomendas
+- mostrar novidades assinaladas pela loja
 - mostrar livros vigiados
 - filtros por idioma, formato, estado e pesquisa
-- futura UI de “new releases” e detalhes do livro
+- detalhes, séries, autores e biblioteca pessoal
+
+## Proveniência e limites dos dados
+
+A app consulta o índice Algolia público da loja Black Library através do backend. A origem atual fornece título, preço, disponibilidade, pré-encomenda, autor, série, formato, género, descrição, imagem, slug e o indicador de novidade `isNewRelease`.
+
+O campo `series` reproduz a categoria do catálogo da loja; pode ser amplo (por exemplo, “Warhammer 40,000”) e não representa necessariamente uma série narrativa ou uma ordem de leitura. A fonte atual não fornece datas de publicação, ISBN, ratings, metadados de audiobook, facções ou ordens de leitura editoriais. Por isso, “Novidades” usa o indicador da loja, não uma cronologia completa.
+
+O Grimdark Archive declara combinar dados da Hardcover com enriquecimento de Wikipedia, Google Books e Track of Words, além de ratings agregados e capas de várias origens. A nossa app não importa dados desse site nem reproduz ratings, sinopses ou ordens editoriais de terceiros.
+
+Os estados Possuído, Lido, Wishlist e reports ficam no `localStorage` deste browser. A watchlist também é sincronizada com o estado local do servidor. Não existe sincronização na cloud nem analytics.
 
 ---
 
