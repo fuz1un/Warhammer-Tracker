@@ -13,6 +13,7 @@ const path  = require('path');
 
 // ─── CONFIG ─────────────────────────────────────────────
 const CONFIG_FILE   = path.join(__dirname, 'config.json');
+const CATALOG_OVERRIDES_FILE = path.join(__dirname, 'catalog-overrides.json');
 const FRONTEND_FILE = path.join(__dirname, 'index.html');
 const DEFAULT_DATA_FILE = path.join(__dirname, 'data', 'state.json');
 
@@ -387,10 +388,18 @@ function sanitizeUrl(value) {
   return `https://www.warhammer.com/${raw.replace(/^\/+/, '')}`;
 }
 
+function isValidCalendarDate(value) {
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return false;
+  const [, year, month, day] = match.map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
 function normalizeReleaseDate(value) {
   const text = sanitizeText(value);
   if (!text || /^(tba|not yet released|coming soon|upcoming|unknown)$/i.test(text)) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return isValidCalendarDate(text) ? text : null;
   if (/^\d{4}$/.test(text)) return text;
 
   const monthMap = {
@@ -401,7 +410,8 @@ function normalizeReleaseDate(value) {
   const matchDayMonthYear = text.match(/^(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\.?\s+(\d{4})$/i);
   if (matchDayMonthYear) {
     const [, day, month, year] = matchDayMonthYear;
-    return `${year}-${monthMap[month.toLowerCase()]}-${String(day).padStart(2, '0')}`;
+    const normalized = `${year}-${monthMap[month.toLowerCase()]}-${String(day).padStart(2, '0')}`;
+    return isValidCalendarDate(normalized) ? normalized : null;
   }
 
   const matchMonthYear = text.match(/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\.?\s+(\d{4})$/i);
@@ -488,6 +498,85 @@ function normalizeBook(h) {
   };
 }
 
+const CATALOG_OVERRIDE_FIELDS = ['authors', 'series', 'releaseDate', 'isbn'];
+
+function loadCatalogOverrides(filePath = CATALOG_OVERRIDES_FILE) {
+  if (!fs.existsSync(filePath)) return {};
+  try {
+    const document = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    if (document.schemaVersion !== 1 || !document.records || typeof document.records !== 'object' || Array.isArray(document.records)) return {};
+    return document.records;
+  } catch(e) {
+    log('[Metadata] Overrides inválidos; ignorados');
+    return {};
+  }
+}
+
+function normalizeOverrideProvenance(entry) {
+  if (!entry || typeof entry !== 'object') return null;
+  const sourceUrl = sanitizeText(entry.sourceUrl);
+  const verifiedAt = sanitizeText(entry.verifiedAt);
+  if (!/^https:\/\//i.test(sourceUrl) || !/^\d{4}-\d{2}-\d{2}$/.test(verifiedAt)) return null;
+  try {
+    const parsedUrl = new URL(sourceUrl);
+    const parsedDate = new Date(`${verifiedAt}T00:00:00Z`);
+    if (parsedUrl.protocol !== 'https:' || parsedDate.toISOString().slice(0, 10) !== verifiedAt) return null;
+  } catch(e) { return null; }
+  return { sourceUrl, verifiedAt };
+}
+
+function normalizeIsbn(value) {
+  const isbn = sanitizeText(value).replace(/[\s-]/g, '').toUpperCase();
+  if (/^\d{9}[\dX]$/.test(isbn)) {
+    const checksum = [...isbn].reduce((sum, digit, index) => sum + (digit === 'X' ? 10 : Number(digit)) * (10 - index), 0);
+    return checksum % 11 === 0 ? isbn : null;
+  }
+  if (/^\d{13}$/.test(isbn)) {
+    const checksum = [...isbn.slice(0, 12)].reduce((sum, digit, index) => sum + Number(digit) * (index % 2 ? 3 : 1), 0);
+    return (10 - checksum % 10) % 10 === Number(isbn[12]) ? isbn : null;
+  }
+  return null;
+}
+
+function applyCatalogOverrides(book, record = {}) {
+  const enriched = { ...book };
+  const metadataSources = { ...(book.metadataSources || {}) };
+
+  for (const field of CATALOG_OVERRIDE_FIELDS) {
+    const entry = record[field];
+    const provenance = normalizeOverrideProvenance(entry);
+    if (!provenance) continue;
+
+    let value;
+    if (field === 'authors') {
+      value = [...new Set((Array.isArray(entry.value) ? entry.value : [entry.value]).map(sanitizeText).filter(Boolean))];
+      if (!value.length) continue;
+      enriched.authors = value;
+      enriched.author = value.join(', ');
+    } else if (field === 'series') {
+      value = sanitizeText(entry.value);
+      if (!value) continue;
+      enriched.series = value;
+    } else if (field === 'releaseDate') {
+      value = normalizeReleaseDate(entry.value);
+      if (!value) continue;
+      enriched.releaseDate = value;
+      enriched.releaseYear = value.slice(0, 4);
+    } else {
+      value = normalizeIsbn(entry.value);
+      if (!value) continue;
+      enriched.isbn = value;
+    }
+
+    metadataSources[field] = provenance;
+  }
+
+  if (Object.keys(metadataSources).length) enriched.metadataSources = metadataSources;
+  return enriched;
+}
+
+const CATALOG_OVERRIDES = loadCatalogOverrides();
+
 async function fetchBooks(tab) {
   const facetFilters = tab === 'preorder'
     ? [['isPreOrder:true'], ['productType:book']]
@@ -505,7 +594,10 @@ async function fetchBooks(tab) {
   } while (page < nbPages);
 
   const seen = new Set();
-  const books = allHits.map(normalizeBook).filter(b => {
+  const books = allHits.map(hit => {
+    const book = normalizeBook(hit);
+    return applyCatalogOverrides(book, CATALOG_OVERRIDES[String(book.id)]);
+  }).filter(b => {
     if (!b.id || seen.has(b.id)) return false;
     seen.add(b.id);
     return true;
@@ -889,6 +981,9 @@ module.exports = {
   normalizeAvailabilityState,
   getTransitionMessage,
   normalizeReleaseDate,
+  loadCatalogOverrides,
+  normalizeIsbn,
+  applyCatalogOverrides,
   sanitizeUrl,
   normalizeCatalogBook,
   buildReleaseSummary,

@@ -70,6 +70,27 @@ O Grimdark Archive declara combinar dados da Hardcover com enriquecimento de Wik
 
 Uma verificação pontual de três títulos encontrou `Horus Rising` na Open Library, mas como uma obra com 24 ISBNs/edições; `Blackheart: Claws of the Maelstrom` e `Master of Rites` não foram encontrados. A Open Library diz que a API não se destina a servir de backend de catálogo e recomenda tráfego baixo e identificado. A Google Books API exige uma chave para dados públicos; uma chamada de teste sem chave foi limitada por quota (`429`). Não ativamos nenhuma destas integrações automáticas. A API GraphQL da Hardcover também exige token; Track of Words é tratado como fonte editorial para consulta e links, não como API de catálogo.
 
+### Complementos verificados
+
+Para preencher campos ausentes sem alterar dados comerciais da loja, usa `watcher/catalog-overrides.json`, indexado pelo ID estável do produto. Cada campo aceite (`authors`, `series`, `releaseDate`, `isbn`) exige `value`, `sourceUrl` HTTPS e `verifiedAt` no formato `AAAA-MM-DD`. Os valores e a fonte aprovada aparecem no detalhe do livro; overrides inválidos são ignorados. Reinicia o servidor após editar o ficheiro.
+
+O primeiro lote contém quatro autores confirmados nas páginas oficiais da edição: Gav Thorpe (*The First Wall*), Mike Brooks (*Brutal Kunnin*), John French (*Slaves to Darkness*) e Ben Counter (*Galaxy in Flames*). Outros registos sem autor continuam em branco enquanto a página da edição não confirmar o crédito.
+
+```json
+{
+  "schemaVersion": 1,
+  "records": {
+    "PRODUCT-ID": {
+      "releaseDate": {
+        "value": "2026-09-19",
+        "sourceUrl": "https://example.org/source-for-this-edition",
+        "verifiedAt": "2026-09-30"
+      }
+    }
+  }
+}
+```
+
 Os estados Possuído, Lido, Wishlist e reports ficam no `localStorage` deste browser. A watchlist também é sincronizada com o estado local do servidor. Não existe sincronização na cloud nem analytics.
 
 ---

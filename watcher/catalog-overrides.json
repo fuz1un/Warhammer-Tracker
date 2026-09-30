@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "records": {
+    "prod4730130-60100181779": {
+      "authors": {
+        "value": ["Gav Thorpe"],
+        "sourceUrl": "https://www.warhammer.com/en-EU/shop/horus-heresy-sot-the-first-wall-pb-2021",
+        "verifiedAt": "2026-09-30"
+      }
+    },
+    "prod4650184-60100181776": {
+      "authors": {
+        "value": ["Mike Brooks"],
+        "sourceUrl": "https://www.warhammer.com/en-EU/shop/Brutal-Kunnin-PB-2021",
+        "verifiedAt": "2026-09-30"
+      }
+    },
+    "prod4370276-60100181735": {
+      "authors": {
+        "value": ["John French"],
+        "sourceUrl": "https://www.warhammer.com/en-EU/shop/Horus-Heresy-Slaves-To-Darkness-PB-2020",
+        "verifiedAt": "2026-09-30"
+      }
+    },
+    "prod2720176-60100181297": {
+      "authors": {
+        "value": ["Ben Counter"],
+        "sourceUrl": "https://www.warhammer.com/en-EU/shop/The-Horus-Heresy-Galaxy-in-Flames",
+        "verifiedAt": "2026-09-30"
+      }
+    }
+  }
+}

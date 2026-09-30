@@ -143,6 +143,7 @@ select:focus{border-color:#c9a84c;outline:none}
 .detail-tag{padding:4px 8px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid rgba(201,168,76,.12);font-size:10px;color:#baab8b;text-transform:uppercase;letter-spacing:.06em}
 .detail-summary{font-size:13px;line-height:1.7;color:#a79c89}
 .detail-source{font-size:11px;line-height:1.5;color:#6b6358}
+.detail-source a{color:#a88c48;text-decoration:underline;text-underline-offset:2px}
 .detail-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
 .detail-section{margin-top:8px;padding-top:10px;border-top:1px solid rgba(201,168,76,.08)}
 .detail-section h3{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#8a7f6e;margin-bottom:8px}
@@ -1043,6 +1044,11 @@ function openBookDetail(id){
   const panel = document.getElementById('book-detail-panel');
   const content = document.getElementById('book-detail-content');
   const summary = book.summary || 'Sem resumo disponível nesta fonte. O livro está listado para acompanhamento e para compra direta quando a loja for carregada.';
+  const sourceLabels = { authors: 'Autor', series: 'Série', releaseDate: 'Data', isbn: 'ISBN' };
+  const metadataSourceLinks = Object.entries(book.metadataSources || {}).map(([field, source]) => {
+    const label = sourceLabels[field] || field;
+    return `<a href="${escapeHtml(source.sourceUrl)}" target="_blank" rel="noopener noreferrer">${label}</a> (${escapeHtml(source.verifiedAt)})`;
+  }).join(' · ');
   const image = book.image ? `<img src="${book.image}" alt="${book.title}" onerror="this.style.display='none';this.parentElement.innerHTML='<div class=\'detail-cover-fallback\'>📚</div>'">` : '<div class="detail-cover-fallback">📚</div>';
   const status = book.availabilityLabel || (book.preorder ? 'Pre-order' : (book.avail ? 'Available' : 'Unavailable'));
   const relatedHtml = related.length ? related.map(item => `
@@ -1071,7 +1077,7 @@ function openBookDetail(id){
           <span class="detail-tag">${book.price || '—'}</span>
         </div>
         <div class="detail-summary">${escapeHtml(summary)}</div>
-        <div class="detail-source">Catálogo e descrição: loja Black Library. A categoria “Série” pode não corresponder à ordem de leitura.</div>
+        <div class="detail-source">Catálogo e descrição: loja Black Library. A categoria “Série” pode não corresponder à ordem de leitura.${metadataSourceLinks ? `<br>Complementos verificados: ${metadataSourceLinks}` : ''}</div>
         ${renderCollectionButtons(book.id)}
         <div class="detail-actions">
           <button class="bs${watched.has(book.id) ? ' on' : ''}" onclick="toggleWatch('${book.id}')">${watched.has(book.id) ? '🔔 A vigiar' : '🔕 Vigiar'}</button>

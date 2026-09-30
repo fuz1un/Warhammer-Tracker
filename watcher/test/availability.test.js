@@ -1,9 +1,14 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const {
   normalizeAvailabilityState,
   getTransitionMessage,
   normalizeReleaseDate,
+  loadCatalogOverrides,
+  normalizeIsbn,
+  applyCatalogOverrides,
   sanitizeUrl,
   normalizeCatalogBook,
   buildReleaseSummary,
@@ -46,6 +51,8 @@ test('returns distinct transition messages', () => {
 test('normalizes release dates from common BL formats', () => {
   assert.equal(normalizeReleaseDate('20 Oct 2026'), '2026-10-20');
   assert.equal(normalizeReleaseDate('2026'), '2026');
+  assert.equal(normalizeReleaseDate('2026-02-30'), null);
+  assert.equal(normalizeReleaseDate('31 Feb 2026'), null);
   assert.equal(normalizeReleaseDate('TBA'), null);
   assert.equal(normalizeReleaseDate('Not yet released'), null);
 });
@@ -98,6 +105,72 @@ test('includes flagged new releases without release dates', () => {
   assert.equal(summary.recent[0].title, 'New title');
   assert.equal(summary.recent[0].series, 'Horus Heresy');
   assert.equal(summary.upcoming.length, 0);
+});
+
+test('loads the versioned metadata override file', () => {
+  const filePath = path.join(__dirname, '..', 'catalog-overrides.json');
+  const document = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  assert.equal(document.schemaVersion, 1);
+  assert.deepEqual(loadCatalogOverrides(), document.records);
+});
+
+test('keeps curated author corrections tied to exact store products and source pages', () => {
+  const overrides = loadCatalogOverrides();
+  const verifiedAuthors = {
+    'prod4730130-60100181779': 'Gav Thorpe',
+    'prod4650184-60100181776': 'Mike Brooks',
+    'prod4370276-60100181735': 'John French',
+    'prod2720176-60100181297': 'Ben Counter',
+  };
+
+  for (const [id, author] of Object.entries(verifiedAuthors)) {
+    assert.deepEqual(overrides[id].authors.value, [author]);
+    assert.match(overrides[id].authors.sourceUrl, /^https:\/\/www\.warhammer\.com\//);
+    assert.equal(overrides[id].authors.verifiedAt, '2026-09-30');
+  }
+});
+
+test('applies verified bibliographic overrides without changing store availability or price', () => {
+  const book = applyCatalogOverrides({
+    id: 'BL-001',
+    title: 'Blackheart: Claws of the Maelstrom',
+    author: null,
+    authors: [],
+    series: null,
+    releaseDate: null,
+    releaseYear: null,
+    isbn: null,
+    price: '€25.00',
+    avail: false,
+  }, {
+    authors: { value: ['Marc Collins'], sourceUrl: 'https://example.org/book', verifiedAt: '2026-09-30' },
+    series: { value: 'Huron Blackheart', sourceUrl: 'https://example.org/series', verifiedAt: '2026-09-30' },
+    releaseDate: { value: '19 Sep 2026', sourceUrl: 'https://example.org/release', verifiedAt: '2026-09-30' },
+    isbn: { value: '9780553804577', sourceUrl: 'https://example.org/isbn', verifiedAt: '2026-09-30' },
+  });
+
+  assert.equal(book.author, 'Marc Collins');
+  assert.equal(book.series, 'Huron Blackheart');
+  assert.equal(book.releaseDate, '2026-09-19');
+  assert.equal(book.releaseYear, '2026');
+  assert.equal(book.isbn, '9780553804577');
+  assert.equal(book.metadataSources.releaseDate.sourceUrl, 'https://example.org/release');
+  assert.equal(book.price, '€25.00');
+  assert.equal(book.avail, false);
+});
+
+test('rejects overrides with missing provenance, invalid dates, or invalid ISBN checksums', () => {
+  const book = applyCatalogOverrides({ id: 'BL-002', author: null, authors: [], releaseDate: null, isbn: null }, {
+    authors: { value: ['Unverified Name'], sourceUrl: 'http://example.org/book', verifiedAt: '2026-09-30' },
+    releaseDate: { value: '2026-02-30', sourceUrl: 'https://example.org/release', verifiedAt: '2026-09-30' },
+    isbn: { value: '9780000000000', sourceUrl: 'https://example.org/isbn', verifiedAt: '2026-09-30' },
+  });
+
+  assert.equal(book.author, null);
+  assert.equal(book.releaseDate, null);
+  assert.equal(book.isbn, null);
+  assert.equal(book.metadataSources, undefined);
+  assert.equal(normalizeIsbn('0-553-80457-X'), '055380457X');
 });
 
 test('allows only trusted origins through the CORS policy', () => {
