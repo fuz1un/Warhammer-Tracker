@@ -240,9 +240,19 @@
   gap: 10px;
 }
 
-.catalog-panel {
+.catalog-panel,
+.browse-panel {
   margin-top: 32px;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
+}
+
+.catalog-panel,
+.browse-panel,
+.roadmap {
+  background: rgba(20, 20, 20, 0.8);
+  border: 1px solid rgba(201, 168, 76, 0.18);
+  border-radius: 16px;
+  padding: 22px 20px;
 }
 
 .catalog-header {
@@ -589,6 +599,51 @@
 .modal-button {
   min-width: 180px;
   justify-content: center;
+}
+
+.browse-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin-top: 10px;
+}
+
+.browse-column {
+  padding: 14px;
+  border-radius: 12px;
+  background: rgba(201, 168, 76, 0.03);
+  border: 1px solid rgba(201, 168, 76, 0.12);
+}
+
+.browse-column h4 {
+  margin: 0 0 12px;
+  font-size: 1.05rem;
+}
+
+.chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  border: 1px solid rgba(201, 168, 76, 0.2);
+  background: rgba(255, 255, 255, 0.01);
+  color: #f4e5b5;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chip span {
+  opacity: 0.8;
+}
+
+.chip.active {
+  background: rgba(201, 168, 76, 0.16);
+  border-color: rgba(201, 168, 76, 0.45);
 }
 
 .roadmap {

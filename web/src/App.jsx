@@ -137,6 +137,34 @@ function App() {
     return [...values].sort((a, b) => a.localeCompare(b))
   }, [books])
 
+  const authorGroups = useMemo(() => {
+    const groups = new Map()
+
+    books.forEach((book) => {
+      const author = book.author || book.authors?.join(', ') || 'Unknown author'
+      groups.set(author, (groups.get(author) || 0) + 1)
+    })
+
+    return [...groups.entries()]
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .slice(0, 12)
+  }, [books])
+
+  const seriesGroups = useMemo(() => {
+    const groups = new Map()
+
+    books.forEach((book) => {
+      const series = book.series || 'Warhammer archive'
+      groups.set(series, (groups.get(series) || 0) + 1)
+    })
+
+    return [...groups.entries()]
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .slice(0, 12)
+  }, [books])
+
   const filteredBooks = useMemo(() => {
     let items = [...books]
 
@@ -271,6 +299,57 @@ function App() {
       </header>
 
       <main>
+        <section className="browse-panel">
+          <div className="catalog-header">
+            <div>
+              <span className="mini-label">Browse by collection</span>
+              <h3>Author and series navigation</h3>
+            </div>
+          </div>
+
+          <div className="browse-grid">
+            <div className="browse-column">
+              <h4>Authors</h4>
+              <div className="chip-group">
+                {authorGroups.map((group) => (
+                  <button
+                    key={group.name}
+                    type="button"
+                    className={selectedAuthor === group.name ? 'chip active' : 'chip'}
+                    onClick={() => {
+                      setSearchMode('author')
+                      setSelectedAuthor(group.name)
+                      setSelectedSeries('all')
+                    }}
+                  >
+                    {group.name} <span>({group.count})</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="browse-column">
+              <h4>Series</h4>
+              <div className="chip-group">
+                {seriesGroups.map((group) => (
+                  <button
+                    key={group.name}
+                    type="button"
+                    className={selectedSeries === group.name ? 'chip active' : 'chip'}
+                    onClick={() => {
+                      setSearchMode('series')
+                      setSelectedSeries(group.name)
+                      setSelectedAuthor('all')
+                    }}
+                  >
+                    {group.name} <span>({group.count})</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section className="hero">
           <div className="hero-copy">
             <span className="pill">Web first • product strategy</span>
