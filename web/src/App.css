@@ -378,6 +378,14 @@
   border: 1px solid rgba(201, 168, 76, 0.14);
   border-radius: 12px;
   padding: 14px;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.book-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(201, 168, 76, 0.32);
+  box-shadow: 0 16px 28px rgba(0, 0, 0, 0.12);
 }
 
 .book-image-wrap {
@@ -461,6 +469,126 @@
   border: 1px solid rgba(201, 168, 76, 0.2);
   padding: 8px 10px;
   font-size: 0.8rem;
+}
+
+.book-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(10, 10, 10, 0.7);
+  backdrop-filter: blur(4px);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.book-modal {
+  position: relative;
+  width: min(920px, 100%);
+  background: rgba(18, 18, 18, 0.98);
+  border: 1px solid rgba(201, 168, 76, 0.25);
+  border-radius: 18px;
+  padding: 22px;
+  box-shadow: 0 28px 60px rgba(0, 0, 0, 0.36);
+}
+
+.close-modal {
+  position: absolute;
+  right: 16px;
+  top: 16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid rgba(201, 168, 76, 0.3);
+  background: rgba(201, 168, 76, 0.05);
+  color: #f5efe6;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.book-modal-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) 1fr;
+  gap: 22px;
+  align-items: start;
+}
+
+.book-modal-image-wrap {
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(201, 168, 76, 0.14);
+  background: rgba(201, 168, 76, 0.04);
+  min-height: 320px;
+}
+
+.book-modal-image-wrap img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cover-placeholder.large {
+  min-height: 320px;
+  font-size: 3rem;
+}
+
+.book-modal-content h3 {
+  margin: 14px 0 8px;
+  font-size: clamp(1.8rem, 3vw, 2.6rem);
+  line-height: 1.1;
+}
+
+.detail-meta {
+  margin: 0 0 18px;
+  color: #d9c9a9;
+  font-size: 1.05rem;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.detail-grid div {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(201, 168, 76, 0.04);
+  border: 1px solid rgba(201, 168, 76, 0.12);
+}
+
+.detail-grid span {
+  display: block;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #c9a84c;
+  margin-bottom: 6px;
+}
+
+.detail-grid strong {
+  font-size: 0.98rem;
+  color: #f7f0e7;
+}
+
+.detail-summary {
+  margin: 18px 0 0;
+  color: #d8c9ac;
+  line-height: 1.7;
+}
+
+.detail-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 22px;
+}
+
+.modal-button {
+  min-width: 180px;
+  justify-content: center;
 }
 
 .roadmap {

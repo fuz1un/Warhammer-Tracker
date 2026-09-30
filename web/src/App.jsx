@@ -78,6 +78,7 @@ function App() {
   const [selectedAuthor, setSelectedAuthor] = useState('all')
   const [selectedSeries, setSelectedSeries] = useState('all')
   const [sortBy, setSortBy] = useState('title')
+  const [selectedBook, setSelectedBook] = useState(null)
 
   useEffect(() => {
     let isCancelled = false
@@ -187,6 +188,73 @@ function App() {
 
   return (
     <div className="app-shell">
+      {selectedBook ? (
+        <div className="book-modal-backdrop" onClick={() => setSelectedBook(null)}>
+          <div className="book-modal" onClick={(event) => event.stopPropagation()}>
+            <button type="button" className="close-modal" onClick={() => setSelectedBook(null)} aria-label="Close details">
+              ×
+            </button>
+
+            <div className="book-modal-grid">
+              <div className="book-modal-image-wrap">
+                {selectedBook.image ? (
+                  <img src={selectedBook.image} alt={selectedBook.title || 'Warhammer book'} />
+                ) : (
+                  <div className="cover-placeholder large">BL</div>
+                )}
+              </div>
+
+              <div className="book-modal-content">
+                <div className="book-status large" style={{
+                  borderColor: selectedBook.availabilityColor || '#c9a84c',
+                  color: selectedBook.availabilityColor || '#f2d57c',
+                  background: `${selectedBook.availabilityColor || '#c9a84c'}1A`,
+                }}>
+                  {selectedBook.availabilityLabel || 'Available'}
+                </div>
+
+                <h3>{selectedBook.title || 'Untitled book'}</h3>
+                <p className="detail-meta">
+                  {selectedBook.author || selectedBook.authors?.join(', ') || 'Unknown author'}
+                </p>
+
+                <div className="detail-grid">
+                  <div>
+                    <span>Series</span>
+                    <strong>{selectedBook.series || 'Warhammer archive'}</strong>
+                  </div>
+                  <div>
+                    <span>Format</span>
+                    <strong>{selectedBook.format || 'Book'}</strong>
+                  </div>
+                  <div>
+                    <span>Release</span>
+                    <strong>{selectedBook.releaseYear || '—'}</strong>
+                  </div>
+                  <div>
+                    <span>Price</span>
+                    <strong>{selectedBook.price || 'Price unavailable'}</strong>
+                  </div>
+                </div>
+
+                <p className="detail-summary">
+                  {selectedBook.summary || 'No summary available for this title yet.'}
+                </p>
+
+                <div className="detail-actions">
+                  <a href={resolveBookUrl(selectedBook.url)} target="_blank" rel="noreferrer" className="primary-button modal-button">
+                    Open official page
+                  </a>
+                  <button type="button" className="secondary-button modal-button" onClick={() => setSelectedBook(null)}>
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <header className="topbar">
         <div className="brand-wrap">
           <div className="brand-mark">⚙</div>
@@ -380,7 +448,7 @@ function App() {
                   const statusStyle = { borderColor: book.availabilityColor || '#c9a84c', color: book.availabilityColor || '#f2d57c', background: `${book.availabilityColor || '#c9a84c'}1A` }
 
                   return (
-                    <article className="book-card" key={book.id || `${book.title}-${book.slug}`}>
+                    <article className="book-card" key={book.id || `${book.title}-${book.slug}`} onClick={() => setSelectedBook(book)}>
                       <div className="book-image-wrap">
                         {book.image ? (
                           <img src={book.image} alt={book.title || 'Warhammer book'} />
@@ -402,7 +470,7 @@ function App() {
 
                       <div className="book-footer">
                         <strong>{book.price || 'Price unavailable'}</strong>
-                        <a href={url} target="_blank" rel="noreferrer">Open</a>
+                        <a href={url} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>Open</a>
                       </div>
                     </article>
                     )
