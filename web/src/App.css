@@ -466,6 +466,7 @@
   align-items: center;
   gap: 10px;
   margin-top: 4px;
+  flex-wrap: wrap;
 }
 
 .book-footer strong {
@@ -479,6 +480,31 @@
   border: 1px solid rgba(201, 168, 76, 0.2);
   padding: 8px 10px;
   font-size: 0.8rem;
+}
+
+.watchlist-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid rgba(201, 168, 76, 0.25);
+  border-radius: 8px;
+  background: rgba(201, 168, 76, 0.04);
+  color: #d9c9a9;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.watchlist-icon.active {
+  color: #f5d88b;
+  background: rgba(201, 168, 76, 0.16);
+}
+
+.watchlist-icon:focus-visible {
+  outline: 2px solid #f5d88b;
+  outline-offset: 2px;
 }
 
 .book-modal-backdrop {

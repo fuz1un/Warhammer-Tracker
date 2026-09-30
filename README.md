@@ -81,14 +81,15 @@ Responsibilities:
 
 ### Frontend
 Main file:
-- `watcher/index.html`
+- `web/src/App.jsx` (React + Vite)
 
 Responsibilities:
-- browse current books and preorders
-- view releases and new titles
-- show watched items and collection state
-- filter by language, format, state and search
-- detail pages and grouped browsing by series / authors
+- browse the live catalog and preorders
+- search and filter by title, author and series
+- view book details and author / series collections
+- manage a browser-local watchlist in `localStorage`
+
+The current watchlist is stored per browser and device. It does not sync between devices or users; that requires the later account and backend-persistence phase.
 
 ---
 
@@ -170,7 +171,7 @@ This is intentionally conservative and should remain conservative. We do not gue
 
 ### Phase 5 — personal library and tracking
 - [x] owned / read / wishlist states
-- [x] local persistence
+- [x] browser-local watchlist persistence for catalog titles
 - [x] personal library dashboard
 - [x] quick marking within the interface
 

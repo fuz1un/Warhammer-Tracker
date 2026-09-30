@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 import { filterBooksByCollection, getCollectionSummary } from './collectionUtils.js'
+import {
+  getWatchlistBooks,
+  isBookWatched,
+  readWatchlist,
+  toggleWatchlist as toggleBookInWatchlist,
+  writeWatchlist,
+} from './watchlist.js'
 
 const pillars = [
   {
@@ -80,6 +87,23 @@ function App() {
   const [selectedSeries, setSelectedSeries] = useState('all')
   const [sortBy, setSortBy] = useState('title')
   const [selectedBook, setSelectedBook] = useState(null)
+  const [watchlist, setWatchlist] = useState(() => readWatchlist())
+  const [watchlistOnly, setWatchlistOnly] = useState(false)
+  const [watchlistStorageAvailable, setWatchlistStorageAvailable] = useState(true)
+
+  function toggleWatchlist(book) {
+    const nextWatchlist = toggleBookInWatchlist(watchlist, book)
+    setWatchlist(nextWatchlist)
+    setWatchlistStorageAvailable(writeWatchlist(nextWatchlist))
+  }
+
+  function showWatchlist() {
+    setWatchlistOnly((current) => !current)
+    setSearchMode('title')
+    setSearchTerm('')
+    setSelectedAuthor('all')
+    setSelectedSeries('all')
+  }
 
   useEffect(() => {
     let isCancelled = false
@@ -167,7 +191,7 @@ function App() {
   }, [books])
 
   const filteredBooks = useMemo(() => {
-    let items = [...books]
+    let items = watchlistOnly ? getWatchlistBooks(watchlist, books) : [...books]
 
     if (searchMode === 'title' && searchTerm.trim()) {
       const query = searchTerm.trim().toLowerCase()
@@ -203,7 +227,7 @@ function App() {
 
       return 0
     })
-  }, [books, searchMode, searchTerm, selectedAuthor, selectedSeries, sortBy])
+  }, [books, searchMode, searchTerm, selectedAuthor, selectedSeries, sortBy, watchlist, watchlistOnly])
 
   const activeCollection = useMemo(() => {
     if (selectedAuthor !== 'all') {
@@ -305,6 +329,13 @@ function App() {
                   <button type="button" className="secondary-button modal-button" onClick={() => setSelectedBook(null)}>
                     Close
                   </button>
+                  <button
+                    type="button"
+                    className="secondary-button modal-button"
+                    onClick={() => toggleWatchlist(selectedBook)}
+                  >
+                    {isBookWatched(watchlist, selectedBook) ? 'Remove from watchlist' : 'Add to watchlist'}
+                  </button>
                 </div>
               </div>
             </div>
@@ -393,6 +424,7 @@ function App() {
                     setSelectedAuthor('all')
                     setSelectedSeries('all')
                     setSearchMode('title')
+                    setWatchlistOnly(false)
                   }}
                 >
                   View full catalog
@@ -502,7 +534,21 @@ function App() {
                     {mode === 'title' ? 'Title' : mode === 'author' ? 'Author' : 'Series'}
                   </button>
                 ))}
+                <button
+                  type="button"
+                  className={watchlistOnly ? 'mode-button active' : 'mode-button'}
+                  onClick={showWatchlist}
+                  aria-pressed={watchlistOnly}
+                >
+                  Watchlist ({watchlist.length})
+                </button>
               </div>
+
+              {!watchlistStorageAvailable ? (
+                <p className="state-text error" role="status">
+                  Browser storage is unavailable. Watchlist changes will not persist after closing this page.
+                </p>
+              ) : null}
 
               <div className="catalog-toolbar">
                 {searchMode === 'title' ? (
@@ -572,8 +618,8 @@ function App() {
 
               {filteredBooks.length === 0 ? (
                 <div className="empty-state">
-                  <h4>No books match this search.</h4>
-                  <p>Try another title, author or series name.</p>
+                  <h4>{watchlistOnly && watchlist.length === 0 ? 'Your watchlist is empty.' : 'No books match this search.'}</h4>
+                  <p>{watchlistOnly && watchlist.length === 0 ? 'Add titles from the catalog to keep them here.' : 'Try another title, author or series name.'}</p>
                 </div>
               ) : (
                 <div className="book-grid">
@@ -606,6 +652,18 @@ function App() {
                       <div className="book-footer">
                         <strong>{book.price || 'Price unavailable'}</strong>
                         <a href={url} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>Open</a>
+                        <button
+                          type="button"
+                          className={isBookWatched(watchlist, book) ? 'watchlist-icon active' : 'watchlist-icon'}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            toggleWatchlist(book)
+                          }}
+                          aria-label={isBookWatched(watchlist, book) ? 'Remove from watchlist' : 'Add to watchlist'}
+                          title={isBookWatched(watchlist, book) ? 'Remove from watchlist' : 'Add to watchlist'}
+                        >
+                          {isBookWatched(watchlist, book) ? '★' : '☆'}
+                        </button>
                       </div>
                     </article>
                     )
