@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import './App.css'
+import { filterBooksByCollection, getCollectionSummary } from './collectionUtils.js'
 
 const pillars = [
   {
@@ -204,6 +205,34 @@ function App() {
     })
   }, [books, searchMode, searchTerm, selectedAuthor, selectedSeries, sortBy])
 
+  const activeCollection = useMemo(() => {
+    if (selectedAuthor !== 'all') {
+      return { type: 'author', value: selectedAuthor }
+    }
+
+    if (selectedSeries !== 'all') {
+      return { type: 'series', value: selectedSeries }
+    }
+
+    return null
+  }, [selectedAuthor, selectedSeries])
+
+  const collectionBooks = useMemo(() => {
+    if (!activeCollection) {
+      return books
+    }
+
+    return filterBooksByCollection(activeCollection.type, activeCollection.value, books)
+  }, [activeCollection, books])
+
+  const collectionSummary = useMemo(() => {
+    if (!activeCollection) {
+      return null
+    }
+
+    return getCollectionSummary(activeCollection.type, activeCollection.value, collectionBooks.length)
+  }, [activeCollection, collectionBooks.length])
+
   const stats = useMemo(() => {
     const available = books.filter((book) => book.availabilityState === 'available').length
     const preorders = books.filter((book) => book.availabilityState === 'preorder').length
@@ -348,6 +377,33 @@ function App() {
               </div>
             </div>
           </div>
+
+          {collectionSummary ? (
+            <div className="collection-panel">
+              <div className="collection-header">
+                <div>
+                  <span className="mini-label">{collectionSummary.label}</span>
+                  <h4>{collectionSummary.name}</h4>
+                </div>
+
+                <button
+                  type="button"
+                  className="secondary-button collection-button"
+                  onClick={() => {
+                    setSelectedAuthor('all')
+                    setSelectedSeries('all')
+                    setSearchMode('title')
+                  }}
+                >
+                  View full catalog
+                </button>
+              </div>
+
+              <p className="collection-copy">
+                Showing {collectionSummary.count} title{collectionSummary.count === 1 ? '' : 's'} from this collection.
+              </p>
+            </div>
+          ) : null}
         </section>
 
         <section className="hero">

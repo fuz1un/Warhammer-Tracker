@@ -620,6 +620,37 @@
   font-size: 1.05rem;
 }
 
+.collection-panel {
+  margin-top: 18px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: rgba(201, 168, 76, 0.04);
+  border: 1px solid rgba(201, 168, 76, 0.16);
+}
+
+.collection-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.collection-header h4 {
+  margin: 8px 0 0;
+  font-size: clamp(1.3rem, 2vw, 1.8rem);
+}
+
+.collection-button {
+  min-width: 180px;
+  justify-content: center;
+}
+
+.collection-copy {
+  margin: 0;
+  color: #d9c9a9;
+}
+
 .chip-group {
   display: flex;
   flex-wrap: wrap;
