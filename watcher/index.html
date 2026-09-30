@@ -266,6 +266,11 @@ select:focus{border-color:#c9a84c;outline:none}
     A vigiar
     <span class="badge" id="wb" style="display:none">0</span>
   </button>
+  <button class="tab" id="tab-collection" onclick="switchTab('collection')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+    Minha biblioteca
+    <span class="badge" id="cb" style="display:none">0</span>
+  </button>
 </div>
 
 <div id="notif-area"></div>
@@ -273,7 +278,7 @@ select:focus{border-color:#c9a84c;outline:none}
 <div class="controls">
   <div class="search-wrap">
     <svg class="s-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-    <input type="text" id="q" placeholder="Pesquisar título, série..." oninput="applyFilters()">
+    <input type="text" id="q" placeholder="Pesquisar título, série ou autor..." oninput="applyFilters()">
   </div>
   <div class="filter-chip" id="fl-wrap">
     <button class="btn-f" type="button" id="fl-btn" onclick="toggleFilterMenu('fl')">
@@ -772,6 +777,7 @@ function toggleCollectionStatus(id, status){
   if(next.length) collectionState[key]=next;
   else delete collectionState[key];
   persistCollection();
+  updateBadge();
   applyFilters();
   render(getVisibleBooks());
 }
@@ -790,6 +796,7 @@ function getVisibleBooks(){
   return books.filter(b=>{
     if(tab==='preorder'&&!b.preorder) return false;
     if(tab==='watchlist'&&!watched.has(b.id)) return false;
+    if(tab==='collection'&&!getCollectionStatus(b.id).length) return false;
     if(watchOnly&&!watched.has(b.id)) return false;
     if(collectionFilter !== 'all' && !getCollectionStatus(b.id).includes(collectionFilter)) return false;
     const searchable=[b.title,b.range,b.series,b.author,b.genre].filter(Boolean).join(' ').toLowerCase();
@@ -910,10 +917,11 @@ function groupBooksByMonth(items){
 function render(list){
   const el=document.getElementById('content');
   if(!list.length){
+    const collectionEmpty = tab === 'collection' && Object.keys(collectionState).length === 0;
     el.innerHTML=`<div class="state-box">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-      <h3>${tab==='releases'?'Sem novidades encontradas':'Nenhum livro encontrado'}</h3>
-      <p>${tab==='releases'?'O catálogo não marcou títulos novos neste momento.':'Tenta ajustar os filtros ou escolher outra vista.'}</p>
+      <h3>${tab==='releases'?'Sem novidades encontradas':(collectionEmpty?'A tua biblioteca está vazia':'Nenhum livro encontrado')}</h3>
+      <p>${tab==='releases'?'O catálogo não marcou títulos novos neste momento.':(collectionEmpty?'Marca livros como Possuído, Lido ou Wishlist para os encontrares aqui.':'Tenta ajustar os filtros ou escolher outra vista.')}</p>
     </div>`;
     return;
   }
@@ -1108,7 +1116,7 @@ async function openHistory(id){
 }
 
 function toggleWatchOnly(){ watchOnly=!watchOnly; document.getElementById('bwo').classList.toggle('on',watchOnly); applyFilters(); }
-function updateBadge(){ const n=watched.size; const b=document.getElementById('wb'); b.textContent=n; b.style.display=n>0?'inline-flex':'none'; document.getElementById('bwo').style.display=n>0?'flex':'none'; }
+function updateBadge(){ const n=watched.size; const b=document.getElementById('wb'); b.textContent=n; b.style.display=n>0?'inline-flex':'none'; document.getElementById('bwo').style.display=n>0?'flex':'none'; const collectionCount=Object.values(collectionState).filter(statuses=>statuses.length>0).length; const collectionBadge=document.getElementById('cb'); collectionBadge.textContent=collectionCount; collectionBadge.style.display=collectionCount>0?'inline-flex':'none'; }
 function switchTab(t){ tab=t; watchOnly=false; books=[]; document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active')); document.getElementById('tab-'+t).classList.add('active'); document.getElementById('bwo').classList.remove('on'); load(); }
 function updateTs(){ document.getElementById('lu').textContent='Atualizado às '+new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}); }
 function spin(on){ document.getElementById('ri').classList.toggle('spin',on); }

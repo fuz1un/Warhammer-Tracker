@@ -93,6 +93,7 @@ Responsabilidades:
 - [x] Listas pessoais: owned / read / wishlist
 - [x] Persistência em ficheiro de estado local
 - [x] Marcação rápida por interface
+- [x] Vista “Minha biblioteca” com contador e filtro de estados pessoais
 
 ### Fase 6 — Qualidade e segurança
 - [x] Revisão de inputs e validação do payload de API
