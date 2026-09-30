@@ -264,11 +264,38 @@
   font-size: 0.85rem;
 }
 
+.catalog-toolbar {
+  display: flex;
+  gap: 16px;
+  margin: 16px 0 18px;
+  flex-wrap: wrap;
+}
+
+.search-box,
+.sort-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #d9c9a9;
+  min-width: 220px;
+  flex: 1;
+}
+
+.search-box input,
+.sort-box select {
+  background: rgba(12, 12, 12, 0.9);
+  border: 1px solid rgba(201, 168, 76, 0.22);
+  border-radius: 10px;
+  color: #f5efe6;
+  padding: 12px 14px;
+  font: inherit;
+}
+
 .catalog-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
-  margin: 16px 0 18px;
+  margin: 0 0 18px;
 }
 
 .summary-item {
@@ -291,6 +318,24 @@
 
 .state-text.error {
   color: #f7a7a7;
+}
+
+.empty-state {
+  border: 1px dashed rgba(201, 168, 76, 0.3);
+  border-radius: 12px;
+  padding: 28px 20px;
+  text-align: center;
+  background: rgba(201, 168, 76, 0.03);
+}
+
+.empty-state h4 {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+}
+
+.empty-state p {
+  margin: 0;
+  color: #d9c9a9;
 }
 
 .book-grid {

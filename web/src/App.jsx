@@ -59,6 +59,8 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [tab, setTab] = useState('all')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [sortBy, setSortBy] = useState('title')
 
   useEffect(() => {
     let isCancelled = false
@@ -94,6 +96,45 @@ function App() {
       isCancelled = true
     }
   }, [tab])
+
+  const filteredBooks = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase()
+    const items = query
+      ? books.filter((book) => {
+          const haystack = [
+            book.title,
+            book.author,
+            book.authors?.join(' '),
+            book.series,
+            book.format,
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase()
+
+          return haystack.includes(query)
+        })
+      : books
+
+    return [...items].sort((a, b) => {
+      if (sortBy === 'title') {
+        return (a.title || '').localeCompare(b.title || '')
+      }
+
+      if (sortBy === 'price') {
+        const priceA = Number.parseFloat(String(a.price || '0').replace(/[^\d.]/g, '')) || 0
+        const priceB = Number.parseFloat(String(b.price || '0').replace(/[^\d.]/g, '')) || 0
+        return priceB - priceA
+      }
+
+      if (sortBy === 'status') {
+        const statusOrder = { available: 0, preorder: 1, 'sold-out-online': 2, 'temporarily-out-of-stock': 3, unknown: 4 }
+        return (statusOrder[a.availabilityState] ?? 99) - (statusOrder[b.availabilityState] ?? 99)
+      }
+
+      return 0
+    })
+  }, [books, searchTerm, sortBy])
 
   const stats = useMemo(() => {
     const available = books.filter((book) => book.availabilityState === 'available').length
@@ -208,10 +249,31 @@ function App() {
 
           {!loading && !error && (
             <>
+              <div className="catalog-toolbar">
+                <label className="search-box">
+                  <span>Search</span>
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    placeholder="Search by title, author or series"
+                  />
+                </label>
+
+                <label className="sort-box">
+                  <span>Sort</span>
+                  <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+                    <option value="title">Title</option>
+                    <option value="price">Price</option>
+                    <option value="status">Status</option>
+                  </select>
+                </label>
+              </div>
+
               <div className="catalog-summary">
                 <div className="summary-item">
                   <span className="summary-label">Visible</span>
-                  <strong>{stats.total}</strong>
+                  <strong>{filteredBooks.length}</strong>
                 </div>
                 <div className="summary-item">
                   <span className="summary-label">Available</span>
@@ -227,8 +289,14 @@ function App() {
                 </div>
               </div>
 
-              <div className="book-grid">
-                {books.map((book) => {
+              {filteredBooks.length === 0 ? (
+                <div className="empty-state">
+                  <h4>No books match this search.</h4>
+                  <p>Try another title, author or series name.</p>
+                </div>
+              ) : (
+                <div className="book-grid">
+                  {filteredBooks.map((book) => {
                   const url = resolveBookUrl(book.url)
                   const statusText = book.availabilityLabel || 'Available'
                   const statusStyle = { borderColor: book.availabilityColor || '#c9a84c', color: book.availabilityColor || '#f2d57c', background: `${book.availabilityColor || '#c9a84c'}1A` }
@@ -259,9 +327,10 @@ function App() {
                         <a href={url} target="_blank" rel="noreferrer">Open</a>
                       </div>
                     </article>
-                  )
-                })}
-              </div>
+                    )
+                  })}
+                </div>
+              )}
             </>
           )}
         </section>
