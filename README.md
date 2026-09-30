@@ -68,6 +68,8 @@ O campo `series` reproduz a categoria do catálogo da loja; pode ser amplo (por 
 
 O Grimdark Archive declara combinar dados da Hardcover com enriquecimento de Wikipedia, Google Books e Track of Words, além de ratings agregados e capas de várias origens. A nossa app não importa dados desse site nem reproduz ratings, sinopses ou ordens editoriais de terceiros.
 
+Uma verificação pontual de três títulos encontrou `Horus Rising` na Open Library, mas como uma obra com 24 ISBNs/edições; `Blackheart: Claws of the Maelstrom` e `Master of Rites` não foram encontrados. A Open Library diz que a API não se destina a servir de backend de catálogo e recomenda tráfego baixo e identificado. A Google Books API exige uma chave para dados públicos; uma chamada de teste sem chave foi limitada por quota (`429`). Não ativamos nenhuma destas integrações automáticas. A API GraphQL da Hardcover também exige token; Track of Words é tratado como fonte editorial para consulta e links, não como API de catálogo.
+
 Os estados Possuído, Lido, Wishlist e reports ficam no `localStorage` deste browser. A watchlist também é sincronizada com o estado local do servidor. Não existe sincronização na cloud nem analytics.
 
 ---
