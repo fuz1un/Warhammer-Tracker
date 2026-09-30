@@ -116,7 +116,7 @@ const BOOK_ATTRIBUTES = [
   'purchasable', 'canAddToCart', 'addToCartDisabled', 'availability', 'availabilityStatus',
   'productStatus', 'stockStatus', 'onlineStockStatus', 'imageUrl', 'image_url',
   'image', 'images', 'media', 'url', 'slug', 'productUrl', 'canonicalUrl', 'path',
-  'range', 'series', 'format', 'bookFormat', 'productFormat', 'author', 'genre', 'description'
+  'range', 'series', 'format', 'bookFormat', 'productFormat', 'author', 'genre', 'description', 'isNewRelease'
 ];
 
 function algoliaQuery(facetFilters, page = 0, hitsPerPage = 250) {
@@ -479,6 +479,7 @@ function normalizeBook(h) {
     authors:             catalogMeta.authors,
     series:              catalogMeta.series,
     genre:               catalogMeta.genre,
+    isNewRelease:        truthy(h.isNewRelease),
     slug:                catalogMeta.slug,
     releaseDate:         catalogMeta.releaseDate,
     releaseYear:         catalogMeta.releaseYear,
@@ -516,7 +517,7 @@ async function fetchBooks(tab) {
 
 function buildReleaseSummary(books = []) {
   const normalized = books
-    .map(book => normalizeCatalogBook(book))
+    .map(book => ({ ...book, ...normalizeCatalogBook(book) }))
     .filter(book => book.releaseDate || book.series || book.author || book.slug);
 
   const byMonth = {};
@@ -529,14 +530,18 @@ function buildReleaseSummary(books = []) {
 
   const sortedMonths = Object.entries(byMonth).sort(([a], [b]) => a.localeCompare(b));
   const recent = [...normalized]
-    .filter(book => book.releaseDate)
-    .sort((a, b) => String(a.releaseDate).localeCompare(String(b.releaseDate)))
-    .slice(0, 12);
+    .filter(book => book.isNewRelease || book.releaseDate)
+    .sort((a, b) => {
+      if (a.releaseDate && b.releaseDate) return String(b.releaseDate).localeCompare(String(a.releaseDate));
+      if (a.isNewRelease !== b.isNewRelease) return a.isNewRelease ? -1 : 1;
+      return String(a.title).localeCompare(String(b.title));
+    })
+    .slice(0, 20);
 
   return {
     generatedAt: new Date().toISOString(),
     total: normalized.length,
-    upcoming: normalized.filter(book => !book.releaseDate).slice(0, 20),
+    upcoming: normalized.filter(book => book.preorder && !book.releaseDate).slice(0, 20),
     recent,
     byMonth: Object.fromEntries(sortedMonths),
   };
@@ -886,6 +891,7 @@ module.exports = {
   normalizeReleaseDate,
   sanitizeUrl,
   normalizeCatalogBook,
+  buildReleaseSummary,
   isAllowedOrigin,
   redactConfig,
 };

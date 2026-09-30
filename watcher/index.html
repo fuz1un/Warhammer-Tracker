@@ -50,8 +50,8 @@ body{background:#111;color:#e8dcc8;font-family:'Inter',system-ui,sans-serif;min-
 .btn-test:hover{background:rgba(201,168,76,.08)}
 .hint{font-size:11px;color:#5a5248;line-height:1.5;margin-top:5px}
 .hint a{color:#c9a84c}
-.tabs{display:flex;background:#0d0d0d;border-bottom:1px solid rgba(201,168,76,.15);padding:0 24px;gap:2px}
-.tab{padding:12px 18px;font-size:12px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:#6b6358;cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;transition:all .2s;display:flex;align-items:center;gap:7px;font-family:inherit}
+.tabs{display:flex;overflow-x:auto;overscroll-behavior-inline:contain;background:#0d0d0d;border-bottom:1px solid rgba(201,168,76,.15);padding:0 24px;gap:2px;scrollbar-width:thin}
+.tab{flex:0 0 auto;white-space:nowrap;padding:12px 18px;font-size:12px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:#6b6358;cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;transition:all .2s;display:flex;align-items:center;gap:7px;font-family:inherit}
 .tab:hover{color:#c0b49e}
 .tab.active{color:#c9a84c;border-bottom-color:#c9a84c}
 .tab svg{width:13px;height:13px;flex-shrink:0}
@@ -154,6 +154,32 @@ select:focus{border-color:#c9a84c;outline:none}
 .state-box svg{width:40px;height:40px;margin:0 auto 16px;display:block;color:#c9a84c;opacity:.4}
 .state-box h3{font-size:15px;color:#c0b49e;margin-bottom:8px}
 .state-box p{font-size:13px}
+@media(max-width:700px){
+  .header{padding:14px 12px}
+  .header-inner{gap:10px}
+  .header h1{font-size:16px}
+  .header-sub{font-size:9px;letter-spacing:.06em}
+  .header-btns{gap:5px}
+  .status-pill{padding:5px 8px;font-size:10px}
+  .icon-btn{padding:7px 9px}
+  .tabs{overflow-x:auto;overscroll-behavior-inline:contain;scrollbar-width:none;padding:0 10px}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{flex:0 0 auto;white-space:nowrap;padding:11px 13px;font-size:11px}
+  .controls{padding:10px 12px}
+  .search-wrap{flex-basis:100%;min-width:0}
+  .controls select{flex:1;min-width:0}
+  .statusbar{padding:8px 12px}
+  .dots{gap:8px}
+  .grid,.series-groups,.author-groups,.month-groups{padding:12px}
+  .detail-overlay,.report-modal{padding:10px}
+  .detail-panel{width:100%;max-height:94vh}
+  .detail-body{grid-template-columns:1fr;gap:12px;padding:14px}
+  .detail-cover{min-height:190px;max-height:240px}
+  .detail-cover img{object-fit:contain}
+  .settings-overlay{padding:62px 10px 10px}
+  .settings-panel{width:100%;max-height:calc(100vh - 72px);padding:16px}
+  .report-panel{padding:16px}
+}
 @keyframes rot{to{transform:rotate(360deg)}}
 .lspin{animation:rot 1.5s linear infinite}
 #toast{position:fixed;bottom:24px;right:24px;z-index:200;display:flex;flex-direction:column;gap:8px;max-width:300px;pointer-events:none}
@@ -288,8 +314,8 @@ select:focus{border-color:#c9a84c;outline:none}
       <div id="fs-options"></div>
     </div>
   </div>
-  <select id="collectionFilter" onchange="collectionFilter=this.value; applyFilters();" aria-label="Filtrar coleção">
-    <option value="all">Todas as coleções</option>
+  <select id="collectionFilter" onchange="setCollectionFilter(this.value)" aria-label="Filtrar coleção pessoal">
+    <option value="all">Minha biblioteca · Todas</option>
     <option value="owned">Possuídos</option>
     <option value="read">Lidos</option>
     <option value="wishlist">Wishlist</option>
@@ -361,11 +387,10 @@ select:focus{border-color:#c9a84c;outline:none}
 <script>
 const PROXY = window.location.origin;
 const WH_BASE = 'https://www.warhammer.com/en-EU/';
-const BOOK_ATTRIBUTES = ['name','title','productCode','objectID','salePrice','price','language','productType','isAvailable','isPreOrder','isInStock','inStock','stockLevel','stockQuantity','quantityAvailable','inventory','isOrderable','orderable','purchasable','canAddToCart','addToCartDisabled','availability','availabilityStatus','productStatus','stockStatus','onlineStockStatus','imageUrl','image_url','image','images','media','url','slug','productUrl','canonicalUrl','path','range','series','format','bookFormat','productFormat','author','genre','description'];
 let books=[], tab='preorder', watchOnly=false, serverOk=false;
 let watched = new Set(JSON.parse(localStorage.getItem('wh_w')||'[]'));
 let watchedBookDetails = [];
-let collectionState = JSON.parse(localStorage.getItem('wh_collection') || '{}');
+let collectionState = Object.fromEntries(Object.entries(JSON.parse(localStorage.getItem('wh_collection') || '{}')).map(([id, value]) => [id, Array.isArray(value) ? value : (value ? [value] : [])]));
 let reports = JSON.parse(localStorage.getItem('wh_reports') || '[]');
 let collectionFilter='all';
 let selectedLangs=[];
@@ -439,10 +464,12 @@ async function load(){
       const d=await r.json();
       hits=(d.hits||[]);
     } else {
-      hits=await loadDirect(tab);
+      throw new Error('Servidor offline. Inicia-o com: node watcher/server.js');
     }
     const baseBooks = hits.map(entry => norm(entry));
-    const extraBooks = (watchedBookDetails||[]).filter(entry => watched.has(entry.id) && !baseBooks.some(book => book.id === entry.id));
+    const extraBooks = tab === 'watchlist'
+      ? (watchedBookDetails||[]).filter(entry => watched.has(entry.id) && !baseBooks.some(book => book.id === entry.id))
+      : [];
     books=dedupeBooks([...baseBooks, ...extraBooks]);
     buildFilters(); updateTs(); applyFilters();
     const e=document.querySelector('.err-box'); if(e) e.remove();
@@ -451,30 +478,15 @@ async function load(){
 }
 
 async function loadReleases(){
-  if(serverOk){
-    const r = await fetch(PROXY+'/releases');
-    if(!r.ok) throw new Error('HTTP '+r.status);
-    const d = await r.json();
-    return (d.recent || []).map(item => ({
-      id: item.slug || item.id || item.title,
-      title: item.title || 'Unknown title',
-      author: item.author || null,
-      series: item.series || null,
-      range: item.series || null,
-      releaseDate: item.releaseDate || null,
-      format: item.format || 'unknown',
-      url: item.url || null,
-      price: '—',
-      availabilityState: 'available',
-      avail: true,
-      preorder: false,
-      image: null,
-      lang: 'en',
-      productType: 'book',
-      ...item,
-    }));
-  }
-  return [];
+  if(!serverOk) throw new Error('Servidor offline. Inicia-o com: node watcher/server.js');
+  const r = await fetch(PROXY+'/releases');
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const d = await r.json();
+  return (d.recent || []).map(item => ({
+    id: item.id || item.slug || item.title,
+    title: item.title || 'Unknown title',
+    ...item,
+  }));
 }
 
 function pickFirst(...values){ return values.find(v=>v!==undefined&&v!==null&&v!==''); }
@@ -614,6 +626,11 @@ function norm(h){
     series:rawText(h.series||h.range||h.collection)||null,
     genre:rawText(h.genre)||null,
     summary:summaryText(h.summary||h.description||h.synopsis)||null,
+    isNewRelease:truthy(h.isNewRelease),
+    author:authors.join(', ')||null, authors,
+    series:rawText(h.series||h.range||h.collection)||null,
+    genre:rawText(h.genre)||null,
+    summary:summaryText(h.summary||h.description||h.synopsis)||null,
     availabilityState,
     availabilityLabel: availabilityState==='sold-out-online' ? 'Sold out online' : (availabilityState==='temporarily-out-of-stock' ? 'Temporarily out of stock' : (preorder?'Pre-order':'Available')),
     availabilityColor: availabilityState==='sold-out-online' ? '#e74c3c' : (availabilityState==='temporarily-out-of-stock' ? '#f39c12' : (preorder ? '#3498db' : '#2ecc71')),
@@ -627,26 +644,6 @@ function dedupeBooks(list){
     seen.add(b.id);
     return true;
   });
-}
-
-async function loadDirect(currentTab){
-  const ff=currentTab==='preorder'?[['isPreOrder:true'],['productType:book']]:[['productType:book']];
-  const all=[];
-  let page=0, nbPages=1;
-  do{
-    const r=await fetch('https://m5ziqznq2h-dsn.algolia.net/1/indexes/prod-lazarus-product-en-eu/query',{
-      method:'POST',
-      headers:{'X-Algolia-Application-Id':'m5ziqznq2h','X-Algolia-API-Key':'92c6a8254f9d34362df8e6d96475e5d8','Content-Type':'application/json'},
-      body:JSON.stringify({hitsPerPage:250,page,facetFilters:ff,attributesToRetrieve:BOOK_ATTRIBUTES})
-    });
-    if(!r.ok) throw new Error('Algolia HTTP '+r.status);
-    const d=await r.json();
-    const hits=d.hits||d.results?.[0]?.hits||[];
-    all.push(...hits);
-    nbPages=Math.min(d.nbPages||d.results?.[0]?.nbPages||1,20);
-    page++;
-  }while(page<nbPages);
-  return all;
 }
 
 function toggleFilterMenu(id, force){
@@ -749,7 +746,7 @@ function matchesStateFilter(book, value){
 }
 
 function getCollectionStatus(id){
-  return collectionState[String(id)] || 'none';
+  return collectionState[String(id)] || [];
 }
 
 function persistCollection(){
@@ -764,20 +761,28 @@ function renderCollectionButtons(id){
     { key: 'wishlist', label: 'Wishlist' }
   ];
   return `<div class="collection-row">${options.map(opt => `
-    <button class="collection-btn ${current === opt.key ? 'active' : ''}" onclick="toggleCollectionStatus('${id}', '${opt.key}')">${opt.label}</button>
+    <button class="collection-btn ${current.includes(opt.key) ? 'active' : ''}" aria-pressed="${current.includes(opt.key)}" onclick="toggleCollectionStatus('${id}', '${opt.key}')">${opt.label}</button>
   `).join('')}</div>`;
 }
 
 function toggleCollectionStatus(id, status){
-  const normalized = status && status !== 'none' ? status : 'none';
-  if (normalized === 'none') {
-    delete collectionState[String(id)];
-  } else {
-    collectionState[String(id)] = normalized;
-  }
+  const key=String(id);
+  const current=getCollectionStatus(key);
+  const next=current.includes(status)?current.filter(value=>value!==status):[...current,status];
+  if(next.length) collectionState[key]=next;
+  else delete collectionState[key];
   persistCollection();
   applyFilters();
   render(getVisibleBooks());
+}
+
+function setCollectionFilter(value){
+  collectionFilter=value;
+  if(value!=='all'&&(tab==='preorder'||tab==='releases')){
+    switchTab('all');
+    return;
+  }
+  applyFilters();
 }
 
 function getVisibleBooks(){
@@ -786,8 +791,9 @@ function getVisibleBooks(){
     if(tab==='preorder'&&!b.preorder) return false;
     if(tab==='watchlist'&&!watched.has(b.id)) return false;
     if(watchOnly&&!watched.has(b.id)) return false;
-    if(collectionFilter !== 'all' && getCollectionStatus(b.id) !== collectionFilter) return false;
-    if(q&&!b.title.toLowerCase().includes(q)&&!(b.range||'').toLowerCase().includes(q)) return false;
+    if(collectionFilter !== 'all' && !getCollectionStatus(b.id).includes(collectionFilter)) return false;
+    const searchable=[b.title,b.range,b.series,b.author,b.genre].filter(Boolean).join(' ').toLowerCase();
+    if(q&&!searchable.includes(q)) return false;
     if(selectedLangs.length && !selectedLangs.includes(b.lang)) return false;
     if(selectedFormats.length && !selectedFormats.includes(b.format)) return false;
     if(selectedStates.length && !selectedStates.some(state=>matchesStateFilter(b,state))) return false;
@@ -828,7 +834,7 @@ function buildCardHtml(b){
     <div class="cb">
       <div class="ct" title="${b.title}">${b.title}</div>
       <div class="cm">
-        ${b.range?`<span class="mt">${b.range}</span>`:''}
+        ${(b.series||b.range)?`<span class="mt">${b.series||b.range}</span>`:''}
         ${b.format?`<span class="mt">${b.formatLabel||b.format}</span>`:''}
         ${releaseMeta}
         ${authorMeta}
@@ -894,8 +900,7 @@ function groupBooksByMonth(items){
   });
 
   for (const book of safeItems) {
-    const monthKey = book.releaseDate ? book.releaseDate.slice(0,7) : 'Sem data';
-    const label = monthKey === 'Sem data' ? 'Sem data' : new Date(`${monthKey}-01T00:00:00`).toLocaleDateString('pt-PT', { month: 'long', year: 'numeric' });
+    const monthKey = book.releaseDate ? book.releaseDate.slice(0,7) : (book.isNewRelease ? 'Novidades' : 'Sem data');
     if (!groups.has(monthKey)) groups.set(monthKey, []);
     groups.get(monthKey).push(book);
   }
@@ -906,11 +911,9 @@ function render(list){
   const el=document.getElementById('content');
   if(!list.length){
     el.innerHTML=`<div class="state-box">
-      <svg class="${books.length===0?'lspin':''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        ${books.length===0?'<polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>':'<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>'}
-      </svg>
-      <h3>${books.length===0?'A carregar...':'Nenhum livro encontrado'}</h3>
-      <p>${books.length===0?'A contactar a API da Warhammer':'Tenta ajustar os filtros'}</p>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      <h3>${tab==='releases'?'Sem novidades encontradas':'Nenhum livro encontrado'}</h3>
+      <p>${tab==='releases'?'O catálogo não marcou títulos novos neste momento.':'Tenta ajustar os filtros ou escolher outra vista.'}</p>
     </div>`;
     return;
   }
@@ -920,7 +923,7 @@ function render(list){
     el.innerHTML = '<div class="series-groups">' + groups.map(([groupName, items]) => `
       <div class="series-group">
         <div class="series-header">
-          <div class="series-name">${groupName}</div>
+          <div class="series-name">${escapeHtml(groupName)}</div>
           <div class="series-meta">${items.length} título${items.length !== 1 ? 's' : ''}</div>
         </div>
         <div class="series-grid">${items.map(buildCardHtml).join('')}</div>
@@ -934,7 +937,7 @@ function render(list){
     el.innerHTML = '<div class="author-groups">' + groups.map(([authorName, items]) => `
       <div class="author-group">
         <div class="author-header">
-          <div class="author-name">${authorName}</div>
+          <div class="author-name">${escapeHtml(authorName)}</div>
           <div class="author-meta">${items.length} título${items.length !== 1 ? 's' : ''}</div>
         </div>
         <div class="author-grid">${items.map(buildCardHtml).join('')}</div>
@@ -948,7 +951,7 @@ function render(list){
     el.innerHTML = '<div class="month-groups">' + groups.map(([monthKey, items]) => `
       <div class="month-group">
         <div class="month-header">
-          <div class="month-name">${monthKey === 'Sem data' ? 'Sem data' : new Date(`${monthKey}-01T00:00:00`).toLocaleDateString('pt-PT', { month: 'long', year: 'numeric' })}</div>
+          <div class="month-name">${monthKey === 'Novidades' || monthKey === 'Sem data' ? monthKey : new Date(`${monthKey}-01T00:00:00`).toLocaleDateString('pt-PT', { month: 'long', year: 'numeric' })}</div>
           <div class="month-meta">${items.length} título${items.length !== 1 ? 's' : ''}</div>
         </div>
         <div class="month-grid">${items.map(buildCardHtml).join('')}</div>
@@ -1098,7 +1101,7 @@ async function openHistory(id){
     const r=await fetch(PROXY+'/history/'+encodeURIComponent(id));
     const data=await r.json();
     const entries=data.history||[];
-    panel.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><strong style="color:#c9a84c">Última semana</strong><button class="bs" onclick="document.getElementById('history-panel').style.display='none'">Fechar</button></div>${entries.length?entries.map(entry=>`<div style="padding:8px 0;border-top:1px solid rgba(201,168,76,.1);font-size:12px;color:#8a7f6e"><div>${new Date(entry.ts).toLocaleString('pt-PT')}</div><div style="color:#c0b49e">${entry.available?'Available':'Unavailable'} · ${entry.preorder?'Pre-order':''} · ${entry.availabilityState}</div></div>`).join(''):'<div style="font-size:12px;color:#6b6358">Ainda não existem registos para este livro.</div>'}`;
+    panel.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><strong style="color:#c9a84c">Última semana</strong><button class="bs" onclick="document.getElementById('history-panel').style.display='none'">Fechar</button></div>${entries.length?entries.map(entry=>{const stateLabel=entry.preorder?'Pré-encomenda':(entry.available?'Disponível':entry.availabilityState==='temporarily-out-of-stock'?'Temporariamente esgotado':entry.availabilityState==='sold-out-online'?'Esgotado online':'Desconhecido');return `<div style="padding:8px 0;border-top:1px solid rgba(201,168,76,.1);font-size:12px;color:#8a7f6e"><div>${new Date(entry.ts).toLocaleString('pt-PT')}</div><div style="color:#c0b49e">${stateLabel}</div></div>`;}).join(''):'<div style="font-size:12px;color:#6b6358">Ainda não existem registos para este livro.</div>'}`;
   }catch(e){
     panel.innerHTML=`<div style="font-size:12px;color:#e74c3c">Não foi possível carregar a história.</div>`;
   }
@@ -1109,7 +1112,7 @@ function updateBadge(){ const n=watched.size; const b=document.getElementById('w
 function switchTab(t){ tab=t; watchOnly=false; books=[]; document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active')); document.getElementById('tab-'+t).classList.add('active'); document.getElementById('bwo').classList.remove('on'); load(); }
 function updateTs(){ document.getElementById('lu').textContent='Atualizado às '+new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}); }
 function spin(on){ document.getElementById('ri').classList.toggle('spin',on); }
-function showErr(m){ document.getElementById('content').innerHTML=`<div class="err-box" style="background:rgba(139,26,26,.12);border:1px solid rgba(192,57,43,.3);border-radius:6px;padding:16px 20px;margin:16px 24px;font-size:13px"><h4 style="color:#c0392b;margin-bottom:8px">⚠ Erro</h4><p style="color:#8a7f6e">${m}</p>${!serverOk?'<p style="color:#8a7f6e;margin-top:8px">Servidor offline — corre <code style="background:#111;padding:2px 6px;border-radius:3px">docker compose up -d</code></p>':''}</div>`; }
+function showErr(m){ document.getElementById('content').innerHTML=`<div class="err-box" style="background:rgba(139,26,26,.12);border:1px solid rgba(192,57,43,.3);border-radius:6px;padding:16px 20px;margin:16px 24px;font-size:13px"><h4 style="color:#c0392b;margin-bottom:8px">⚠ Erro</h4><p style="color:#8a7f6e">${m}</p></div>`; }
 function toast(t,b,d=4000){ const el=document.createElement('div'); el.className='ti'; el.innerHTML=`<div class="tt">${t}</div><div class="tb">${b}</div>`; document.getElementById('toast').appendChild(el); setTimeout(()=>el.remove(),d); }
 function toggleSettings(){ document.getElementById('settings-overlay').classList.toggle('open'); }
 function closeOut(e){ if(e.target===document.getElementById('settings-overlay')) document.getElementById('settings-overlay').classList.remove('open'); }

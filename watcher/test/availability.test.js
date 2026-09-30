@@ -6,6 +6,7 @@ const {
   normalizeReleaseDate,
   sanitizeUrl,
   normalizeCatalogBook,
+  buildReleaseSummary,
   isAllowedOrigin,
   redactConfig,
 } = require('../server');
@@ -85,6 +86,18 @@ test('preserves every author on co-authored books', () => {
 
   assert.equal(book.author, 'Guy Haley, Andy Clark, Gav Thorpe');
   assert.deepEqual(book.authors, ['Guy Haley', 'Andy Clark', 'Gav Thorpe']);
+});
+
+test('includes flagged new releases without release dates', () => {
+  const summary = buildReleaseSummary([
+    { id: 'BL-NEW', title: 'New title', series: 'Horus Heresy', isNewRelease: true },
+    { id: 'BL-OLD', title: 'Older title', series: 'Horus Heresy', isNewRelease: false },
+  ]);
+
+  assert.equal(summary.recent.length, 1);
+  assert.equal(summary.recent[0].title, 'New title');
+  assert.equal(summary.recent[0].series, 'Horus Heresy');
+  assert.equal(summary.upcoming.length, 0);
 });
 
 test('allows only trusted origins through the CORS policy', () => {
