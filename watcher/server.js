@@ -304,11 +304,27 @@ function normalizeLanguage(value, title = '', url = '') {
 
 function normalizeUrl(path) {
   if (!path) return null;
-  const value = String(path);
-  if (value.startsWith('http')) return value.replace(/(warhammer\.com\/en-[a-z]{2}\/)(?!shop\/)/i, '$1shop/');
+  const value = String(path).trim();
+  if (!value) return null;
+
+  if (/^(javascript:|data:|vbscript:)/i.test(value)) return null;
+  if (value.startsWith('http://') || value.startsWith('https://')) {
+    try {
+      const parsed = new URL(value);
+      if (parsed.hostname === 'warhammer.com' || parsed.hostname === 'www.warhammer.com') {
+        const cleanPath = parsed.pathname.replace(/^\/+/, '');
+        if (!cleanPath || cleanPath.includes('/shop/')) return parsed.toString();
+        return `https://www.warhammer.com/en-EU/shop/${cleanPath}`;
+      }
+      return parsed.toString();
+    } catch (error) {
+      return null;
+    }
+  }
+
+  if (value.startsWith('//')) return `https:${value}`;
   const clean = value.replace(/^\/+/, '');
   if (clean.includes('/shop/')) return `https://www.warhammer.com/${clean}`;
-  if (clean.startsWith('en-')) return `https://www.warhammer.com/${clean.replace(/^(en-[a-z]{2})\//i, '$1/shop/')}`;
   return `https://www.warhammer.com/en-EU/shop/${clean}`;
 }
 
@@ -378,14 +394,7 @@ function sanitizeSummary(value) {
 }
 
 function sanitizeUrl(value) {
-  const raw = sanitizeText(value);
-  if (!raw) return null;
-  const lower = raw.toLowerCase();
-  if (lower.startsWith('javascript:') || lower.startsWith('data:') || lower.startsWith('vbscript:')) return null;
-  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
-  if (raw.startsWith('//')) return `https:${raw}`;
-  if (raw.startsWith('/')) return `https://www.warhammer.com${raw.startsWith('/') ? raw : `/${raw}`}`;
-  return `https://www.warhammer.com/${raw.replace(/^\/+/, '')}`;
+  return normalizeUrl(value);
 }
 
 function isValidCalendarDate(value) {
@@ -895,19 +904,22 @@ const server = http.createServer(async (req, res) => {
 
   if (url.pathname === '/books' && req.method === 'GET') {
     try {
-      const tab = searchParams.get('tab') || 'all';
-      const cached = tab === 'preorder' ? latestCatalog.preorder : latestCatalog.all;
-      const hits = cached.length ? cached : await fetchBooks(tab);
-      if (tab === 'preorder') latestCatalog.preorder = hits; else latestCatalog.all = hits;
+      const tab = (searchParams.get('tab') || 'all').toLowerCase();
+      const target = tab === 'preorder' ? 'preorder' : 'all';
+      const cached = target === 'preorder' ? latestCatalog.preorder : latestCatalog.all;
+      const hits = cached.length ? cached : await fetchBooks(target);
+      if (target === 'preorder') latestCatalog.preorder = hits; else latestCatalog.all = hits;
       return json(res, 200, { hits });
     } catch(e) { return json(res, 500, { error: e.message }); }
   }
 
   if (url.pathname === '/catalog' && req.method === 'GET') {
     try {
-      const tab = searchParams.get('tab') || 'all';
-      const hits = latestCatalog.all.length ? latestCatalog.all : await fetchBooks(tab);
-      latestCatalog.all = hits;
+      const tab = (searchParams.get('tab') || 'all').toLowerCase();
+      const target = tab === 'preorder' ? 'preorder' : 'all';
+      const cached = target === 'preorder' ? latestCatalog.preorder : latestCatalog.all;
+      const hits = cached.length ? cached : await fetchBooks(target);
+      if (target === 'preorder') latestCatalog.preorder = hits; else latestCatalog.all = hits;
       return json(res, 200, {
         hits,
         total: hits.length,

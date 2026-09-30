@@ -48,9 +48,23 @@ async function fetchJson(url) {
 
 function resolveBookUrl(url) {
   if (!url) return '#'
-  if (/^https?:\/\//i.test(url)) return url
+
+  if (/^https?:\/\//i.test(url)) {
+    try {
+      const parsed = new URL(url)
+      const path = parsed.pathname.replace(/^\/+/, '')
+      if ((parsed.hostname === 'warhammer.com' || parsed.hostname === 'www.warhammer.com') && !path.includes('/shop/')) {
+        return `https://www.warhammer.com/en-EU/shop/${path}`
+      }
+      return url
+    } catch {
+      return '#'
+    }
+  }
+
   if (url.startsWith('/')) return `https://www.warhammer.com${url}`
-  return `https://www.warhammer.com/${url}`
+  if (url.includes('/shop/')) return `https://www.warhammer.com/${url}`
+  return `https://www.warhammer.com/en-EU/shop/${url.replace(/^\/+/, '')}`
 }
 
 function App() {
@@ -59,7 +73,10 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [tab, setTab] = useState('all')
+  const [searchMode, setSearchMode] = useState('title')
   const [searchTerm, setSearchTerm] = useState('')
+  const [selectedAuthor, setSelectedAuthor] = useState('all')
+  const [selectedSeries, setSelectedSeries] = useState('all')
   const [sortBy, setSortBy] = useState('title')
 
   useEffect(() => {
@@ -97,26 +114,48 @@ function App() {
     }
   }, [tab])
 
+  const authorOptions = useMemo(() => {
+    const values = new Set()
+
+    books.forEach((book) => {
+      const author = book.author || book.authors?.join(', ') || ''
+      if (author.trim()) values.add(author.trim())
+    })
+
+    return [...values].sort((a, b) => a.localeCompare(b))
+  }, [books])
+
+  const seriesOptions = useMemo(() => {
+    const values = new Set()
+
+    books.forEach((book) => {
+      const series = book.series || ''
+      if (series.trim()) values.add(series.trim())
+    })
+
+    return [...values].sort((a, b) => a.localeCompare(b))
+  }, [books])
+
   const filteredBooks = useMemo(() => {
-    const query = searchTerm.trim().toLowerCase()
-    const items = query
-      ? books.filter((book) => {
-          const haystack = [
-            book.title,
-            book.author,
-            book.authors?.join(' '),
-            book.series,
-            book.format,
-          ]
-            .filter(Boolean)
-            .join(' ')
-            .toLowerCase()
+    let items = [...books]
 
-          return haystack.includes(query)
-        })
-      : books
+    if (searchMode === 'title' && searchTerm.trim()) {
+      const query = searchTerm.trim().toLowerCase()
+      items = items.filter((book) => (book.title || '').toLowerCase().includes(query))
+    }
 
-    return [...items].sort((a, b) => {
+    if (searchMode === 'author' && selectedAuthor !== 'all') {
+      items = items.filter((book) => {
+        const author = book.author || book.authors?.join(', ') || ''
+        return author === selectedAuthor
+      })
+    }
+
+    if (searchMode === 'series' && selectedSeries !== 'all') {
+      items = items.filter((book) => (book.series || '') === selectedSeries)
+    }
+
+    return items.sort((a, b) => {
       if (sortBy === 'title') {
         return (a.title || '').localeCompare(b.title || '')
       }
@@ -134,7 +173,7 @@ function App() {
 
       return 0
     })
-  }, [books, searchTerm, sortBy])
+  }, [books, searchMode, searchTerm, selectedAuthor, selectedSeries, sortBy])
 
   const stats = useMemo(() => {
     const available = books.filter((book) => book.availabilityState === 'available').length
@@ -249,16 +288,55 @@ function App() {
 
           {!loading && !error && (
             <>
+              <div className="search-mode-row" aria-label="Search mode selector">
+                {['title', 'author', 'series'].map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    className={searchMode === mode ? 'mode-button active' : 'mode-button'}
+                    onClick={() => setSearchMode(mode)}
+                  >
+                    {mode === 'title' ? 'Title' : mode === 'author' ? 'Author' : 'Series'}
+                  </button>
+                ))}
+              </div>
+
               <div className="catalog-toolbar">
-                <label className="search-box">
-                  <span>Search</span>
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(event) => setSearchTerm(event.target.value)}
-                    placeholder="Search by title, author or series"
-                  />
-                </label>
+                {searchMode === 'title' ? (
+                  <label className="search-box">
+                    <span>Search by title</span>
+                    <input
+                      type="text"
+                      value={searchTerm}
+                      onChange={(event) => setSearchTerm(event.target.value)}
+                      placeholder="Type a title"
+                    />
+                  </label>
+                ) : null}
+
+                {searchMode === 'author' ? (
+                  <label className="search-box">
+                    <span>Author</span>
+                    <select value={selectedAuthor} onChange={(event) => setSelectedAuthor(event.target.value)}>
+                      <option value="all">All authors</option>
+                      {authorOptions.map((author) => (
+                        <option key={author} value={author}>{author}</option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
+
+                {searchMode === 'series' ? (
+                  <label className="search-box">
+                    <span>Series</span>
+                    <select value={selectedSeries} onChange={(event) => setSelectedSeries(event.target.value)}>
+                      <option value="all">All series</option>
+                      {seriesOptions.map((series) => (
+                        <option key={series} value={series}>{series}</option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
 
                 <label className="sort-box">
                   <span>Sort</span>
