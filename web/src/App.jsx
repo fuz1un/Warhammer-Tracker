@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 
 const pillars = [
@@ -33,6 +33,11 @@ const stack = [
   'Future checkout assistance',
 ]
 
+const tabs = [
+  { key: 'all', label: 'All titles' },
+  { key: 'preorder', label: 'Pre-orders' },
+]
+
 async function fetchJson(url) {
   const response = await fetch(url)
   if (!response.ok) {
@@ -41,31 +46,64 @@ async function fetchJson(url) {
   return response.json()
 }
 
+function resolveBookUrl(url) {
+  if (!url) return '#'
+  if (/^https?:\/\//i.test(url)) return url
+  if (url.startsWith('/')) return `https://www.warhammer.com${url}`
+  return `https://www.warhammer.com/${url}`
+}
+
 function App() {
   const [health, setHealth] = useState(null)
   const [books, setBooks] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [tab, setTab] = useState('all')
 
   useEffect(() => {
+    let isCancelled = false
+
     async function load() {
+      setLoading(true)
+      setError('')
+
       try {
         const [healthData, catalogData] = await Promise.all([
           fetchJson('/api/health'),
-          fetchJson('/api/catalog?tab=all'),
+          fetchJson(`/api/catalog?tab=${tab}`),
         ])
 
+        if (isCancelled) return
+
         setHealth(healthData)
-        setBooks(Array.isArray(catalogData.hits) ? catalogData.hits.slice(0, 12) : [])
+        setBooks(Array.isArray(catalogData.hits) ? catalogData.hits : [])
       } catch (err) {
-        setError(err.message)
+        if (!isCancelled) {
+          setError(err.message)
+        }
       } finally {
-        setLoading(false)
+        if (!isCancelled) {
+          setLoading(false)
+        }
       }
     }
 
     load()
-  }, [])
+
+    return () => {
+      isCancelled = true
+    }
+  }, [tab])
+
+  const stats = useMemo(() => {
+    const available = books.filter((book) => book.availabilityState === 'available').length
+    const preorders = books.filter((book) => book.availabilityState === 'preorder').length
+    const soldOut = books.filter((book) =>
+      ['sold-out-online', 'temporarily-out-of-stock'].includes(book.availabilityState),
+    ).length
+
+    return { total: books.length, available, preorders, soldOut }
+  }, [books])
 
   return (
     <div className="app-shell">
@@ -94,8 +132,8 @@ function App() {
               editorial browsing and later-stage user accounts — without guessing when the source is weak.
             </p>
             <div className="cta-row">
-              <button type="button">View roadmap</button>
-              <button type="button" className="secondary">See architecture</button>
+              <a href="#roadmap" className="primary-button">View roadmap</a>
+              <a href="#architecture" className="secondary-button">See architecture</a>
             </div>
           </div>
 
@@ -146,27 +184,85 @@ function App() {
 
         <section className="catalog-panel">
           <div className="catalog-header">
-            <span className="mini-label">Live catalog preview</span>
-            <h3>Official product feed</h3>
+            <div>
+              <span className="mini-label">Live catalog preview</span>
+              <h3>Official product feed</h3>
+            </div>
+
+            <div className="tab-group" aria-label="Catalog filters">
+              {tabs.map((entry) => (
+                <button
+                  key={entry.key}
+                  type="button"
+                  className={entry.key === tab ? 'tab-button active' : 'tab-button'}
+                  onClick={() => setTab(entry.key)}
+                >
+                  {entry.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {loading && <p className="state-text">Loading catalog…</p>}
           {error && <p className="state-text error">Could not connect to the API: {error}</p>}
 
           {!loading && !error && (
-            <div className="book-grid">
-              {books.map((book) => (
-                <article className="book-card" key={book.id || book.title}>
-                  <div className="book-flag">{book.availabilityState || 'available'}</div>
-                  <h4>{book.title || 'Untitled book'}</h4>
-                  <p>{book.author || 'Unknown author'}</p>
-                  <div className="book-meta">
-                    <span>{book.format || 'Book'}</span>
-                    <span>{book.price || '—'}</span>
-                  </div>
-                </article>
-              ))}
-            </div>
+            <>
+              <div className="catalog-summary">
+                <div className="summary-item">
+                  <span className="summary-label">Visible</span>
+                  <strong>{stats.total}</strong>
+                </div>
+                <div className="summary-item">
+                  <span className="summary-label">Available</span>
+                  <strong>{stats.available}</strong>
+                </div>
+                <div className="summary-item">
+                  <span className="summary-label">Pre-order</span>
+                  <strong>{stats.preorders}</strong>
+                </div>
+                <div className="summary-item">
+                  <span className="summary-label">Unavailable</span>
+                  <strong>{stats.soldOut}</strong>
+                </div>
+              </div>
+
+              <div className="book-grid">
+                {books.map((book) => {
+                  const url = resolveBookUrl(book.url)
+                  const statusText = book.availabilityLabel || 'Available'
+                  const statusStyle = { borderColor: book.availabilityColor || '#c9a84c', color: book.availabilityColor || '#f2d57c', background: `${book.availabilityColor || '#c9a84c'}1A` }
+
+                  return (
+                    <article className="book-card" key={book.id || `${book.title}-${book.slug}`}>
+                      <div className="book-image-wrap">
+                        {book.image ? (
+                          <img src={book.image} alt={book.title || 'Warhammer book'} />
+                        ) : (
+                          <div className="cover-placeholder">BL</div>
+                        )}
+                      </div>
+
+                      <div className="book-status" style={statusStyle}>{statusText}</div>
+
+                      <h4>{book.title || 'Untitled book'}</h4>
+                      <p className="book-author">{book.author || book.authors?.join(', ') || 'Unknown author'}</p>
+                      <p className="book-series">{book.series || 'Warhammer archive'}</p>
+
+                      <div className="book-meta">
+                        <span>{book.format || 'Book'}</span>
+                        <span>{book.releaseYear || '—'}</span>
+                      </div>
+
+                      <div className="book-footer">
+                        <strong>{book.price || 'Price unavailable'}</strong>
+                        <a href={url} target="_blank" rel="noreferrer">Open</a>
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+            </>
           )}
         </section>
 
