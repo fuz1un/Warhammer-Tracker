@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import './App.css'
-import { filterBooksByCollection, filterBooksByStatus, getCollectionSummary } from './collectionUtils.js'
+import { filterBooksByCollection, filterBooksByStatus, getCollectionSummary, paginateBooks } from './collectionUtils.js'
 import {
   getWatchlistBooks,
   isBookWatched,
@@ -100,6 +100,8 @@ function App() {
   const [selectedSeries, setSelectedSeries] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [sortBy, setSortBy] = useState('title')
+  const [pageSize] = useState(24)
+  const [visibleCount, setVisibleCount] = useState(24)
   const [releaseSummary, setReleaseSummary] = useState(null)
   const [selectedBook, setSelectedBook] = useState(null)
   const [watchlist, setWatchlist] = useState(() => readWatchlist())
@@ -252,6 +254,12 @@ function App() {
       return 0
     })
   }, [books, searchMode, searchTerm, selectedAuthor, selectedSeries, sortBy, statusFilter, watchlist, watchlistOnly])
+
+  const visibleBooks = useMemo(() => filteredBooks.slice(0, visibleCount), [filteredBooks, visibleCount])
+
+  useEffect(() => {
+    setVisibleCount(24)
+  }, [books, searchMode, searchTerm, selectedAuthor, selectedSeries, statusFilter, sortBy, watchlistOnly, watchlist, tab])
 
   const activeCollection = useMemo(() => {
     if (selectedAuthor !== 'all') {
@@ -710,7 +718,7 @@ function App() {
                     <div key={monthKey} className="release-group">
                       <h4>{formatMonthLabel(monthKey)}</h4>
                       <div className="book-grid">
-                        {monthBooks.map((book) => {
+                        {monthBooks.slice(0, visibleCount).map((book) => {
                           const url = book.url ? resolveBookUrl(book.url) : null
                           const statusText = book.availabilityLabel || 'Available'
                           const statusStyle = { borderColor: book.availabilityColor || '#c9a84c', color: book.availabilityColor || '#f2d57c', background: `${book.availabilityColor || '#c9a84c'}1A` }
@@ -761,7 +769,7 @@ function App() {
                 </div>
               ) : (
                 <div className="book-grid">
-                  {filteredBooks.map((book) => {
+                  {visibleBooks.map((book) => {
                     const url = book.url ? resolveBookUrl(book.url) : null
                     const statusText = book.availabilityLabel || 'Available'
                     const statusStyle = { borderColor: book.availabilityColor || '#c9a84c', color: book.availabilityColor || '#f2d57c', background: `${book.availabilityColor || '#c9a84c'}1A` }
@@ -808,6 +816,14 @@ function App() {
                   })}
                 </div>
               )}
+
+              {filteredBooks.length > visibleCount ? (
+                <div className="load-more-wrap">
+                  <button type="button" className="primary-button load-more-button" onClick={() => setVisibleCount((count) => count + pageSize)}>
+                    Load more ({Math.min(pageSize, filteredBooks.length - visibleCount)} more)
+                  </button>
+                </div>
+              ) : null}
             </>
           )}
         </section>

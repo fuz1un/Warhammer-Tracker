@@ -44,6 +44,16 @@ export function filterBooksByStatus(statusFilter, books) {
   return books
 }
 
+export function paginateBooks(books, pageSize = 24, page = 1) {
+  if (!Array.isArray(books)) return []
+
+  const safePageSize = Number.isFinite(pageSize) && pageSize > 0 ? pageSize : 24
+  const safePage = Number.isFinite(page) && page > 0 ? page : 1
+  const start = (safePage - 1) * safePageSize
+
+  return books.slice(start, start + safePageSize)
+}
+
 export function getCollectionSummary(collectionType, collectionValue, totalItems = 0) {
   const safeType = collectionType === 'author' ? 'author' : collectionType === 'series' ? 'series' : 'collection'
   const safeValue = String(collectionValue || '').trim()

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { filterBooksByCollection, filterBooksByStatus, getCollectionSummary } from './collectionUtils.js'
+import { filterBooksByCollection, filterBooksByStatus, getCollectionSummary, paginateBooks } from './collectionUtils.js'
 
 test('matches books by author and series collection', () => {
   const books = [
@@ -25,6 +25,15 @@ test('filters books by stock state for a richer frontend catalog view', () => {
   assert.deepEqual(filterBooksByStatus('preorder', books).map((book) => book.title), ['Preorder now'])
   assert.deepEqual(filterBooksByStatus('unavailable', books).map((book) => book.title), ['Sold out', 'Temporarily unavailable'])
   assert.deepEqual(filterBooksByStatus('all', books).length, books.length)
+})
+
+test('paginates the catalog in predictable chunks for incremental loading', () => {
+  const books = Array.from({ length: 10 }, (_, index) => ({ title: `Book ${index + 1}` }))
+
+  assert.deepEqual(paginateBooks(books, 4, 1).map((book) => book.title), ['Book 1', 'Book 2', 'Book 3', 'Book 4'])
+  assert.deepEqual(paginateBooks(books, 4, 2).map((book) => book.title), ['Book 5', 'Book 6', 'Book 7', 'Book 8'])
+  assert.deepEqual(paginateBooks(books, 4, 3).map((book) => book.title), ['Book 9', 'Book 10'])
+  assert.deepEqual(paginateBooks([], 4, 1), [])
 })
 
 test('builds readable collection headers and labels', () => {
