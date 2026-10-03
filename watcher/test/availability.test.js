@@ -12,6 +12,7 @@ const {
   sanitizeUrl,
   normalizeCatalogBook,
   buildReleaseSummary,
+  loadArchiveCatalog,
   isAllowedOrigin,
   redactConfig,
 } = require('../server');
@@ -83,6 +84,52 @@ test('adds richer catalog metadata for release browsing', () => {
   assert.equal(book.format, 'hardback');
   assert.equal(book.url, 'https://www.warhammer.com/en-EU/shop/blackheart-claws-of-the-maelstrom');
   assert.equal(book.author, 'Marc Collins');
+});
+
+test('loads curated archive records without presenting them as live stock', () => {
+  const archive = loadArchiveCatalog();
+
+  assert.ok(Array.isArray(archive));
+  assert.ok(archive.every(book => book.sourceType === 'curated-archive'));
+  assert.ok(archive.every(book => book.availabilityState === 'unknown'));
+});
+
+test('requires separate verified sources for curated archive metadata fields', () => {
+  const filePath = path.join(__dirname, 'archive-fixture.json');
+  fs.writeFileSync(filePath, JSON.stringify({
+    schemaVersion: 1,
+    records: [{
+      id: 'fixture-title-001',
+      title: 'Fixture Novel',
+      author: 'Example Author',
+      series: 'Example Series',
+      releaseDate: '2006',
+      format: 'Paperback',
+      sources: {
+        title: { sourceUrl: 'https://example.org/title', verifiedAt: '2026-10-03' },
+        authors: { sourceUrl: 'https://example.org/author', verifiedAt: '2026-10-03' },
+        series: { sourceUrl: 'http://example.org/series', verifiedAt: '2026-10-03' },
+        releaseDate: { sourceUrl: 'https://example.org/year', verifiedAt: '2026-10-03' },
+        format: { sourceUrl: 'https://example.org/format', verifiedAt: '2026-10-03' },
+      },
+    }],
+  }));
+
+  try {
+    const [book] = loadArchiveCatalog(filePath);
+    assert.equal(book.title, 'Fixture Novel');
+    assert.equal(book.author, 'Example Author');
+    assert.equal(book.series, null);
+    assert.equal(book.releaseYear, '2006');
+    assert.equal(book.format, 'paperback');
+    assert.equal(book.availabilityState, 'unknown');
+    assert.equal(book.metadataSources.series, undefined);
+    assert.equal(book.metadataSources.title.sourceUrl, 'https://example.org/title');
+    assert.equal(book.url, null);
+    assert.equal(book.summary, null);
+  } finally {
+    fs.unlinkSync(filePath);
+  }
 });
 
 test('preserves every author on co-authored books', () => {

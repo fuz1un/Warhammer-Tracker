@@ -14,6 +14,7 @@ const path  = require('path');
 // ─── CONFIG ─────────────────────────────────────────────
 const CONFIG_FILE   = path.join(__dirname, 'config.json');
 const CATALOG_OVERRIDES_FILE = path.join(__dirname, 'catalog-overrides.json');
+const ARCHIVE_CATALOG_FILE = path.join(__dirname, 'archive-catalog.json');
 const FRONTEND_FILE = path.join(__dirname, 'index.html');
 const DEFAULT_DATA_FILE = path.join(__dirname, 'data', 'state.json');
 
@@ -584,6 +585,62 @@ function applyCatalogOverrides(book, record = {}) {
   return enriched;
 }
 
+function loadArchiveCatalog(filePath = ARCHIVE_CATALOG_FILE) {
+  if (!fs.existsSync(filePath)) return [];
+
+  try {
+    const document = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    if (document.schemaVersion !== 1 || !Array.isArray(document.records)) return [];
+
+    return document.records.flatMap(record => {
+      const id = sanitizeText(record?.id);
+      const title = sanitizeText(record?.title);
+      const suppliedSources = record?.sources && typeof record.sources === 'object' && !Array.isArray(record.sources)
+        ? record.sources
+        : {};
+      const metadataSources = Object.fromEntries(Object.entries(suppliedSources)
+        .flatMap(([field, source]) => {
+          const provenance = normalizeOverrideProvenance(source);
+          return provenance ? [[field, provenance]] : [];
+        }));
+      if (!id || !title || !metadataSources.title) return [];
+
+      const authors = metadataSources.authors
+        ? [...new Set((Array.isArray(record.authors) ? record.authors : [record.author])
+          .map(sanitizeText).filter(Boolean))]
+        : [];
+      const series = metadataSources.series ? sanitizeText(record.series) : '';
+      const releaseDate = metadataSources.releaseDate ? normalizeReleaseDate(record.releaseDate) : null;
+      const format = metadataSources.format ? normalizeFormat(record.format, title) : '';
+      const isbn = metadataSources.isbn ? normalizeIsbn(record.isbn) : null;
+
+      return [{
+        id,
+        title,
+        sourceType: 'curated-archive',
+        availabilityState: 'unknown',
+        availabilityLabel: 'Historical record',
+        availabilityColor: '#8a7f6e',
+        avail: false,
+        preorder: false,
+        author: authors.join(', ') || null,
+        authors,
+        series: series || null,
+        format: format || 'unknown',
+        releaseDate,
+        releaseYear: releaseDate ? releaseDate.slice(0, 4) : null,
+        isbn,
+        url: null,
+        summary: null,
+        metadataSources,
+      }];
+    });
+  } catch(e) {
+    log('[Archive] Catálogo inválido; ignorado');
+    return [];
+  }
+}
+
 const CATALOG_OVERRIDES = loadCatalogOverrides();
 
 async function fetchBooks(tab) {
@@ -936,6 +993,16 @@ const server = http.createServer(async (req, res) => {
     } catch(e) { return json(res, 500, { error: e.message }); }
   }
 
+  if (url.pathname === '/archive' && req.method === 'GET') {
+    const hits = loadArchiveCatalog();
+    return json(res, 200, {
+      sourceType: 'curated-archive',
+      total: hits.length,
+      generatedAt: new Date().toISOString(),
+      hits,
+    });
+  }
+
   if (url.pathname === '/watched') {
     if (req.method === 'GET') {
       return json(res, 200, { watched: state.watched, lastStatus: state.lastStatus, lastSeen: state.lastSeen });
@@ -1001,6 +1068,7 @@ module.exports = {
   sanitizeUrl,
   normalizeCatalogBook,
   buildReleaseSummary,
+  loadArchiveCatalog,
   isAllowedOrigin,
   redactConfig,
 };

@@ -414,7 +414,7 @@ function App() {
                   </div>
                   <div>
                     <span>Format</span>
-                    <strong>{selectedBook.format || selectedBook.editions?.[0]?.format || 'Book'}</strong>
+                    <strong className="format-value">{selectedBook.format || selectedBook.editions?.[0]?.format || 'Book'}</strong>
                   </div>
                   <div>
                     <span>Release</span>
@@ -432,7 +432,7 @@ function App() {
                     <p>Availability: not checked against the current official catalog.</p>
                     {selectedBook.editions?.map((edition) => (
                       <div className="archive-edition" key={edition.id}>
-                        <strong>{edition.format || 'Edition'}{edition.publishedOn ? ` · ${edition.publishedOn}` : ''}</strong>
+                        <strong className="format-value">{edition.format || 'Edition'}{edition.publishedOn ? ` · ${edition.publishedOn}` : ''}</strong>
                         <span>{[edition.publisher, edition.language, edition.isbn13 && `ISBN ${edition.isbn13}`].filter(Boolean).join(' · ')}</span>
                         <span>Record checked {edition.verifiedAt || selectedBook.verifiedAt || 'date not recorded'}</span>
                         <div className="archive-source-links">
@@ -526,14 +526,21 @@ function App() {
           </div>
         </div>
         <nav className="topnav" aria-label="Main navigation">
-          <a href="#product">Product</a>
-          <a href="#roadmap">Roadmap</a>
-          <a href="#architecture">Architecture</a>
+          <a href="#catalog">Catalog</a>
+          <a href="#browse">Collections</a>
+          <details className="project-menu">
+            <summary>Project info</summary>
+            <div className="project-menu-list">
+              <a href="#product">Product principles</a>
+              <a href="#architecture">Architecture</a>
+              <a href="#roadmap">Roadmap</a>
+            </div>
+          </details>
         </nav>
       </header>
 
       <main>
-        <section className="browse-panel">
+        <section className="browse-panel" id="browse">
           <div className="catalog-header">
             <div>
               <span className="mini-label">Browse by collection</span>
@@ -671,7 +678,7 @@ function App() {
           </div>
         </section>
 
-        <section className="catalog-panel">
+        <section className="catalog-panel" id="catalog">
           <div className="catalog-header">
             <div>
               <span className="mini-label">{tab === 'archive' ? 'Curated archive' : tab === 'upcoming' ? 'Upcoming catalog' : 'Live catalog preview'}</span>
@@ -805,8 +812,8 @@ function App() {
 
               {filteredBooks.length === 0 ? (
                 <div className="empty-state">
-                  <h4>{watchlistOnly && watchlist.length === 0 ? 'Your watchlist is empty.' : tab === 'upcoming' ? 'No upcoming releases match this filter.' : 'No books match this search.'}</h4>
-                  <p>{watchlistOnly && watchlist.length === 0 ? 'Add titles from the catalog to keep them here.' : tab === 'upcoming' ? 'Try a different month or reset the filters.' : 'Try another title, author or series name.'}</p>
+                  <h4>{tab === 'archive' ? 'No curated archive titles are loaded yet.' : watchlistOnly && watchlist.length === 0 ? 'Your watchlist is empty.' : tab === 'upcoming' ? 'No upcoming releases match this filter.' : 'No books match this search.'}</h4>
+                  <p>{tab === 'archive' ? 'Archive records will appear here after their sources and reuse terms have been reviewed.' : watchlistOnly && watchlist.length === 0 ? 'Add titles from the catalog to keep them here.' : tab === 'upcoming' ? 'Try a different month or reset the filters.' : 'Try another title, author or series name.'}</p>
                 </div>
               ) : tab === 'upcoming' && upcomingGroups.length > 0 ? (
                 <div className="release-groups">
@@ -844,7 +851,7 @@ function App() {
                               <p className="book-series">{book.series || 'Warhammer archive'}</p>
 
                               <div className="book-meta">
-                                <span>{book.format || book.editions?.[0]?.format || 'Book'}</span>
+                                <span className="format-value">{book.format || book.editions?.[0]?.format || 'Book'}</span>
                                 <span>{book.releaseYear || book.editions?.[0]?.publishedOn || '—'}</span>
                               </div>
 
@@ -903,7 +910,7 @@ function App() {
                         <p className="book-series">{book.series || 'Warhammer archive'}</p>
 
                         <div className="book-meta">
-                          <span>{book.format || book.editions?.[0]?.format || 'Book'}</span>
+                          <span className="format-value">{book.format || book.editions?.[0]?.format || 'Book'}</span>
                           <span>{book.releaseYear || book.editions?.[0]?.publishedOn || '—'}</span>
                         </div>
 

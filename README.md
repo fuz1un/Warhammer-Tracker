@@ -45,7 +45,8 @@ In short, we want to become the best source for information, discovery, and rest
 - [x] Collection, wishlist and personal history flows
 - [x] Correction reporting for missing or wrong metadata
 - [x] Hardened configuration and safer local setup
-- [ ] Final smoke tests and integrated validation
+- [x] Final smoke tests and integrated validation
+- [x] Archive API route and source-gated catalog foundation
 
 ---
 
@@ -108,6 +109,8 @@ We intentionally avoid pretending that a third-party catalog is the same as the 
 
 This gives us a real trust model, which is essential for a product that aims to be useful beyond a simple watcher.
 
+The archive endpoint is now available, but its curated catalog is intentionally empty until each source's reuse terms are reviewed and every imported field has its own verified provenance. See [catalog source review](docs/catalog-data-sources.md).
+
 ### Verified metadata overrides
 
 To fill missing fields without altering official sales data, the project uses `watcher/catalog-overrides.json`, keyed by stable product ID. Accepted fields are `authors`, `series`, `releaseDate`, and `isbn`.
@@ -147,14 +150,14 @@ This is intentionally conservative and should remain conservative. We do not gue
 - [x] add catalog and releases endpoints
 - [x] sanitize URLs and harden logs
 - [x] implement watched collections and notifications
-- [ ] richer filtering in the frontend
+- [x] richer filtering in the frontend
 
 ### Phase 2 — release discovery and editorial browsing
 - [x] new releases tab
-- [ ] upcoming / future release tab
+- [x] upcoming / future release tab
 - [x] order by date and show release groups
 - [x] month-based grouping for release browsing
-- [ ] pagination or incremental loading
+- [x] pagination or incremental loading
 
 ### Phase 3 — product details and provenance
 - [x] book detail panel
