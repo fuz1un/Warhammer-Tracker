@@ -44,6 +44,7 @@ const stack = [
 const tabs = [
   { key: 'all', label: 'All titles' },
   { key: 'preorder', label: 'Pre-orders' },
+  { key: 'upcoming', label: 'Upcoming' },
   { key: 'archive', label: 'Archive editions' },
 ]
 
@@ -76,6 +77,17 @@ function resolveBookUrl(url) {
   return `https://www.warhammer.com/en-EU/shop/${url.replace(/^\/+/, '')}`
 }
 
+function formatMonthLabel(monthKey) {
+  if (!monthKey || monthKey === 'unknown') return 'Upcoming'
+
+  const safeDate = `${monthKey}-01T00:00:00`
+  const date = new Date(safeDate)
+
+  if (Number.isNaN(date.getTime())) return monthKey
+
+  return new Intl.DateTimeFormat('en', { month: 'long', year: 'numeric' }).format(date)
+}
+
 function App() {
   const [health, setHealth] = useState(null)
   const [books, setBooks] = useState([])
@@ -88,6 +100,7 @@ function App() {
   const [selectedSeries, setSelectedSeries] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [sortBy, setSortBy] = useState('title')
+  const [releaseSummary, setReleaseSummary] = useState(null)
   const [selectedBook, setSelectedBook] = useState(null)
   const [watchlist, setWatchlist] = useState(() => readWatchlist())
   const [watchlistOnly, setWatchlistOnly] = useState(false)
@@ -118,13 +131,20 @@ function App() {
       try {
         const [healthData, catalogData] = await Promise.all([
           fetchJson('/api/health'),
-          fetchJson(tab === 'archive' ? '/api/archive' : `/api/catalog?tab=${tab}`),
+          fetchJson(tab === 'archive' ? '/api/archive' : tab === 'upcoming' ? '/api/releases' : `/api/catalog?tab=${tab}`),
         ])
 
         if (isCancelled) return
 
         setHealth(healthData)
-        setBooks(Array.isArray(catalogData.hits) ? catalogData.hits : [])
+
+        if (tab === 'upcoming') {
+          setBooks(Array.isArray(catalogData.upcoming) ? catalogData.upcoming : [])
+          setReleaseSummary(catalogData)
+        } else {
+          setBooks(Array.isArray(catalogData.hits) ? catalogData.hits : [])
+          setReleaseSummary(null)
+        }
       } catch (err) {
         if (!isCancelled) {
           setError(err.message)
@@ -260,6 +280,22 @@ function App() {
 
     return getCollectionSummary(activeCollection.type, activeCollection.value, collectionBooks.length)
   }, [activeCollection, collectionBooks.length])
+
+  const upcomingGroups = useMemo(() => {
+    if (tab !== 'upcoming') return []
+
+    const groups = new Map()
+
+    filteredBooks.forEach((book) => {
+      const monthKey = book.releaseDate ? book.releaseDate.slice(0, 7) : 'unknown'
+      if (!groups.has(monthKey)) {
+        groups.set(monthKey, [])
+      }
+      groups.get(monthKey).push(book)
+    })
+
+    return [...groups.entries()].sort(([left], [right]) => left.localeCompare(right))
+  }, [filteredBooks, tab])
 
   const stats = useMemo(() => {
     const available = books.filter((book) => book.availabilityState === 'available').length
@@ -534,8 +570,8 @@ function App() {
         <section className="catalog-panel">
           <div className="catalog-header">
             <div>
-              <span className="mini-label">{tab === 'archive' ? 'Curated archive' : 'Live catalog preview'}</span>
-              <h3>{tab === 'archive' ? 'Historical archive editions' : 'Official product feed'}</h3>
+              <span className="mini-label">{tab === 'archive' ? 'Curated archive' : tab === 'upcoming' ? 'Upcoming catalog' : 'Live catalog preview'}</span>
+              <h3>{tab === 'archive' ? 'Historical archive editions' : tab === 'upcoming' ? 'Upcoming releases' : 'Official product feed'}</h3>
             </div>
 
             <div className="tab-group" aria-label="Catalog filters">
@@ -665,54 +701,109 @@ function App() {
 
               {filteredBooks.length === 0 ? (
                 <div className="empty-state">
-                  <h4>{watchlistOnly && watchlist.length === 0 ? 'Your watchlist is empty.' : 'No books match this search.'}</h4>
-                  <p>{watchlistOnly && watchlist.length === 0 ? 'Add titles from the catalog to keep them here.' : 'Try another title, author or series name.'}</p>
+                  <h4>{watchlistOnly && watchlist.length === 0 ? 'Your watchlist is empty.' : tab === 'upcoming' ? 'No upcoming releases match this filter.' : 'No books match this search.'}</h4>
+                  <p>{watchlistOnly && watchlist.length === 0 ? 'Add titles from the catalog to keep them here.' : tab === 'upcoming' ? 'Try a different month or reset the filters.' : 'Try another title, author or series name.'}</p>
+                </div>
+              ) : tab === 'upcoming' && upcomingGroups.length > 0 ? (
+                <div className="release-groups">
+                  {upcomingGroups.map(([monthKey, monthBooks]) => (
+                    <div key={monthKey} className="release-group">
+                      <h4>{formatMonthLabel(monthKey)}</h4>
+                      <div className="book-grid">
+                        {monthBooks.map((book) => {
+                          const url = book.url ? resolveBookUrl(book.url) : null
+                          const statusText = book.availabilityLabel || 'Available'
+                          const statusStyle = { borderColor: book.availabilityColor || '#c9a84c', color: book.availabilityColor || '#f2d57c', background: `${book.availabilityColor || '#c9a84c'}1A` }
+
+                          return (
+                            <article className="book-card" key={book.id || `${book.title}-${book.slug}`} onClick={() => setSelectedBook(book)}>
+                              <div className="book-image-wrap">
+                                {book.image ? (
+                                  <img src={book.image} alt={book.title || 'Warhammer book'} />
+                                ) : (
+                                  <div className="cover-placeholder">BL</div>
+                                )}
+                              </div>
+
+                              <div className="book-status" style={statusStyle}>{statusText}</div>
+
+                              <h4>{book.title || 'Untitled book'}</h4>
+                              <p className="book-author">{book.author || book.authors?.join(', ') || 'Unknown author'}</p>
+                              <p className="book-series">{book.series || 'Warhammer archive'}</p>
+
+                              <div className="book-meta">
+                                <span>{book.format || book.editions?.[0]?.format || 'Book'}</span>
+                                <span>{book.releaseYear || book.editions?.[0]?.publishedOn || '—'}</span>
+                              </div>
+
+                              <div className="book-footer">
+                                <strong>{book.sourceType === 'curated-archive' ? 'Archive record' : (book.price || 'Price unavailable')}</strong>
+                                {url ? <a href={url} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>Official listing</a> : null}
+                                <button
+                                  type="button"
+                                  className={isBookWatched(watchlist, book) ? 'watchlist-icon active' : 'watchlist-icon'}
+                                  onClick={(event) => {
+                                    event.stopPropagation()
+                                    toggleWatchlist(book)
+                                  }}
+                                  aria-label={isBookWatched(watchlist, book) ? 'Remove from watchlist' : 'Add to watchlist'}
+                                  title={isBookWatched(watchlist, book) ? 'Remove from watchlist' : 'Add to watchlist'}
+                                >
+                                  {isBookWatched(watchlist, book) ? '★' : '☆'}
+                                </button>
+                              </div>
+                            </article>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div className="book-grid">
                   {filteredBooks.map((book) => {
-                  const url = book.url ? resolveBookUrl(book.url) : null
-                  const statusText = book.availabilityLabel || 'Available'
-                  const statusStyle = { borderColor: book.availabilityColor || '#c9a84c', color: book.availabilityColor || '#f2d57c', background: `${book.availabilityColor || '#c9a84c'}1A` }
+                    const url = book.url ? resolveBookUrl(book.url) : null
+                    const statusText = book.availabilityLabel || 'Available'
+                    const statusStyle = { borderColor: book.availabilityColor || '#c9a84c', color: book.availabilityColor || '#f2d57c', background: `${book.availabilityColor || '#c9a84c'}1A` }
 
-                  return (
-                    <article className="book-card" key={book.id || `${book.title}-${book.slug}`} onClick={() => setSelectedBook(book)}>
-                      <div className="book-image-wrap">
-                        {book.image ? (
-                          <img src={book.image} alt={book.title || 'Warhammer book'} />
-                        ) : (
-                          <div className="cover-placeholder">BL</div>
-                        )}
-                      </div>
+                    return (
+                      <article className="book-card" key={book.id || `${book.title}-${book.slug}`} onClick={() => setSelectedBook(book)}>
+                        <div className="book-image-wrap">
+                          {book.image ? (
+                            <img src={book.image} alt={book.title || 'Warhammer book'} />
+                          ) : (
+                            <div className="cover-placeholder">BL</div>
+                          )}
+                        </div>
 
-                      <div className="book-status" style={statusStyle}>{statusText}</div>
+                        <div className="book-status" style={statusStyle}>{statusText}</div>
 
-                      <h4>{book.title || 'Untitled book'}</h4>
-                      <p className="book-author">{book.author || book.authors?.join(', ') || 'Unknown author'}</p>
-                      <p className="book-series">{book.series || 'Warhammer archive'}</p>
+                        <h4>{book.title || 'Untitled book'}</h4>
+                        <p className="book-author">{book.author || book.authors?.join(', ') || 'Unknown author'}</p>
+                        <p className="book-series">{book.series || 'Warhammer archive'}</p>
 
-                      <div className="book-meta">
-                        <span>{book.format || book.editions?.[0]?.format || 'Book'}</span>
-                        <span>{book.releaseYear || book.editions?.[0]?.publishedOn || '—'}</span>
-                      </div>
+                        <div className="book-meta">
+                          <span>{book.format || book.editions?.[0]?.format || 'Book'}</span>
+                          <span>{book.releaseYear || book.editions?.[0]?.publishedOn || '—'}</span>
+                        </div>
 
-                      <div className="book-footer">
-                        <strong>{book.sourceType === 'curated-archive' ? 'Archive record' : (book.price || 'Price unavailable')}</strong>
-                        {url ? <a href={url} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>Official listing</a> : null}
-                        <button
-                          type="button"
-                          className={isBookWatched(watchlist, book) ? 'watchlist-icon active' : 'watchlist-icon'}
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            toggleWatchlist(book)
-                          }}
-                          aria-label={isBookWatched(watchlist, book) ? 'Remove from watchlist' : 'Add to watchlist'}
-                          title={isBookWatched(watchlist, book) ? 'Remove from watchlist' : 'Add to watchlist'}
-                        >
-                          {isBookWatched(watchlist, book) ? '★' : '☆'}
-                        </button>
-                      </div>
-                    </article>
+                        <div className="book-footer">
+                          <strong>{book.sourceType === 'curated-archive' ? 'Archive record' : (book.price || 'Price unavailable')}</strong>
+                          {url ? <a href={url} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>Official listing</a> : null}
+                          <button
+                            type="button"
+                            className={isBookWatched(watchlist, book) ? 'watchlist-icon active' : 'watchlist-icon'}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              toggleWatchlist(book)
+                            }}
+                            aria-label={isBookWatched(watchlist, book) ? 'Remove from watchlist' : 'Add to watchlist'}
+                            title={isBookWatched(watchlist, book) ? 'Remove from watchlist' : 'Add to watchlist'}
+                          >
+                            {isBookWatched(watchlist, book) ? '★' : '☆'}
+                          </button>
+                        </div>
+                      </article>
                     )
                   })}
                 </div>
