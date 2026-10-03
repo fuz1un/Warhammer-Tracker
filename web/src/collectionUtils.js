@@ -21,6 +21,29 @@ export function filterBooksByCollection(collectionType, collectionValue, books) 
   })
 }
 
+export function filterBooksByStatus(statusFilter, books) {
+  if (!Array.isArray(books)) return []
+
+  const value = String(statusFilter || 'all').trim().toLowerCase()
+  if (!value || value === 'all') {
+    return books
+  }
+
+  if (value === 'available') {
+    return books.filter((book) => String(book.availabilityState || '').trim() === 'available')
+  }
+
+  if (value === 'preorder') {
+    return books.filter((book) => String(book.availabilityState || '').trim() === 'preorder')
+  }
+
+  if (value === 'unavailable') {
+    return books.filter((book) => ['sold-out-online', 'temporarily-out-of-stock'].includes(String(book.availabilityState || '').trim()))
+  }
+
+  return books
+}
+
 export function getCollectionSummary(collectionType, collectionValue, totalItems = 0) {
   const safeType = collectionType === 'author' ? 'author' : collectionType === 'series' ? 'series' : 'collection'
   const safeValue = String(collectionValue || '').trim()

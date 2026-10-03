@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import './App.css'
-import { filterBooksByCollection, getCollectionSummary } from './collectionUtils.js'
+import { filterBooksByCollection, filterBooksByStatus, getCollectionSummary } from './collectionUtils.js'
 import {
   getWatchlistBooks,
   isBookWatched,
@@ -44,6 +44,7 @@ const stack = [
 const tabs = [
   { key: 'all', label: 'All titles' },
   { key: 'preorder', label: 'Pre-orders' },
+  { key: 'archive', label: 'Archive editions' },
 ]
 
 async function fetchJson(url) {
@@ -85,6 +86,7 @@ function App() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedAuthor, setSelectedAuthor] = useState('all')
   const [selectedSeries, setSelectedSeries] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [sortBy, setSortBy] = useState('title')
   const [selectedBook, setSelectedBook] = useState(null)
   const [watchlist, setWatchlist] = useState(() => readWatchlist())
@@ -103,6 +105,7 @@ function App() {
     setSearchTerm('')
     setSelectedAuthor('all')
     setSelectedSeries('all')
+    setStatusFilter('all')
   }
 
   useEffect(() => {
@@ -115,7 +118,7 @@ function App() {
       try {
         const [healthData, catalogData] = await Promise.all([
           fetchJson('/api/health'),
-          fetchJson(`/api/catalog?tab=${tab}`),
+          fetchJson(tab === 'archive' ? '/api/archive' : `/api/catalog?tab=${tab}`),
         ])
 
         if (isCancelled) return
@@ -192,6 +195,7 @@ function App() {
 
   const filteredBooks = useMemo(() => {
     let items = watchlistOnly ? getWatchlistBooks(watchlist, books) : [...books]
+    items = filterBooksByStatus(statusFilter, items)
 
     if (searchMode === 'title' && searchTerm.trim()) {
       const query = searchTerm.trim().toLowerCase()
@@ -227,7 +231,7 @@ function App() {
 
       return 0
     })
-  }, [books, searchMode, searchTerm, selectedAuthor, selectedSeries, sortBy, watchlist, watchlistOnly])
+  }, [books, searchMode, searchTerm, selectedAuthor, selectedSeries, sortBy, statusFilter, watchlist, watchlistOnly])
 
   const activeCollection = useMemo(() => {
     if (selectedAuthor !== 'all') {
@@ -306,11 +310,11 @@ function App() {
                   </div>
                   <div>
                     <span>Format</span>
-                    <strong>{selectedBook.format || 'Book'}</strong>
+                    <strong>{selectedBook.format || selectedBook.editions?.[0]?.format || 'Book'}</strong>
                   </div>
                   <div>
                     <span>Release</span>
-                    <strong>{selectedBook.releaseYear || '—'}</strong>
+                    <strong>{selectedBook.releaseYear || selectedBook.editions?.[0]?.publishedOn || '—'}</strong>
                   </div>
                   <div>
                     <span>Price</span>
@@ -318,14 +322,44 @@ function App() {
                   </div>
                 </div>
 
+                {selectedBook.sourceType === 'curated-archive' ? (
+                  <div className="archive-editions">
+                    <h4>Recorded editions</h4>
+                    <p>Availability: not checked against the current official catalog.</p>
+                    {selectedBook.editions?.map((edition) => (
+                      <div className="archive-edition" key={edition.id}>
+                        <strong>{edition.format || 'Edition'}{edition.publishedOn ? ` · ${edition.publishedOn}` : ''}</strong>
+                        <span>{[edition.publisher, edition.language, edition.isbn13 && `ISBN ${edition.isbn13}`].filter(Boolean).join(' · ')}</span>
+                        <span>Record checked {edition.verifiedAt || selectedBook.verifiedAt || 'date not recorded'}</span>
+                        <div className="archive-source-links">
+                          {edition.sources?.map((source) => (
+                            <a key={`${edition.id}-${source.url}`} href={source.url} target="_blank" rel="noreferrer">Source: {source.label}</a>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                {selectedBook.metadataSources ? (
+                  <div className="metadata-source-list">
+                    <span>Metadata sources</span>
+                    {Object.entries(selectedBook.metadataSources).map(([field, source]) => (
+                      <a key={field} href={source.url} target="_blank" rel="noreferrer">{field}: {source.label}</a>
+                    ))}
+                  </div>
+                ) : null}
+
                 <p className="detail-summary">
                   {selectedBook.summary || 'No summary available for this title yet.'}
                 </p>
 
                 <div className="detail-actions">
-                  <a href={resolveBookUrl(selectedBook.url)} target="_blank" rel="noreferrer" className="primary-button modal-button">
-                    Open official page
-                  </a>
+                  {selectedBook.url ? (
+                    <a href={resolveBookUrl(selectedBook.url)} target="_blank" rel="noreferrer" className="primary-button modal-button">
+                      Open official page
+                    </a>
+                  ) : null}
                   <button type="button" className="secondary-button modal-button" onClick={() => setSelectedBook(null)}>
                     Close
                   </button>
@@ -500,8 +534,8 @@ function App() {
         <section className="catalog-panel">
           <div className="catalog-header">
             <div>
-              <span className="mini-label">Live catalog preview</span>
-              <h3>Official product feed</h3>
+              <span className="mini-label">{tab === 'archive' ? 'Curated archive' : 'Live catalog preview'}</span>
+              <h3>{tab === 'archive' ? 'Historical archive editions' : 'Official product feed'}</h3>
             </div>
 
             <div className="tab-group" aria-label="Catalog filters">
@@ -551,6 +585,19 @@ function App() {
               ) : null}
 
               <div className="catalog-toolbar">
+                <div className="status-filters" aria-label="Status filters">
+                  {['all', 'available', 'preorder', 'unavailable'].map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      className={statusFilter === option ? 'mode-button active' : 'mode-button'}
+                      onClick={() => setStatusFilter(option)}
+                    >
+                      {option === 'all' ? 'All' : option === 'available' ? 'Available' : option === 'preorder' ? 'Pre-order' : 'Unavailable'}
+                    </button>
+                  ))}
+                </div>
+
                 {searchMode === 'title' ? (
                   <label className="search-box">
                     <span>Search by title</span>
@@ -624,7 +671,7 @@ function App() {
               ) : (
                 <div className="book-grid">
                   {filteredBooks.map((book) => {
-                  const url = resolveBookUrl(book.url)
+                  const url = book.url ? resolveBookUrl(book.url) : null
                   const statusText = book.availabilityLabel || 'Available'
                   const statusStyle = { borderColor: book.availabilityColor || '#c9a84c', color: book.availabilityColor || '#f2d57c', background: `${book.availabilityColor || '#c9a84c'}1A` }
 
@@ -645,13 +692,13 @@ function App() {
                       <p className="book-series">{book.series || 'Warhammer archive'}</p>
 
                       <div className="book-meta">
-                        <span>{book.format || 'Book'}</span>
-                        <span>{book.releaseYear || '—'}</span>
+                        <span>{book.format || book.editions?.[0]?.format || 'Book'}</span>
+                        <span>{book.releaseYear || book.editions?.[0]?.publishedOn || '—'}</span>
                       </div>
 
                       <div className="book-footer">
-                        <strong>{book.price || 'Price unavailable'}</strong>
-                        <a href={url} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>Open</a>
+                        <strong>{book.sourceType === 'curated-archive' ? 'Archive record' : (book.price || 'Price unavailable')}</strong>
+                        {url ? <a href={url} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>Official listing</a> : null}
                         <button
                           type="button"
                           className={isBookWatched(watchlist, book) ? 'watchlist-icon active' : 'watchlist-icon'}
