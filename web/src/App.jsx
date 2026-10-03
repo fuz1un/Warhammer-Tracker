@@ -95,7 +95,14 @@ function formatMonthLabel(monthKey) {
   return new Intl.DateTimeFormat('en', { month: 'long', year: 'numeric' }).format(date)
 }
 
+function getPageFromHash(hash) {
+  return hash.startsWith('#project') || ['#product', '#architecture', '#roadmap'].includes(hash)
+    ? 'project'
+    : 'catalog'
+}
+
 function App() {
+  const [page, setPage] = useState(() => getPageFromHash(window.location.hash))
   const [health, setHealth] = useState(null)
   const [books, setBooks] = useState([])
   const [loading, setLoading] = useState(true)
@@ -135,6 +142,15 @@ function App() {
     setSelectedSeries('all')
     setStatusFilter('all')
   }
+
+  useEffect(() => {
+    function syncPageWithHash() {
+      setPage(getPageFromHash(window.location.hash))
+    }
+
+    window.addEventListener('hashchange', syncPageWithHash)
+    return () => window.removeEventListener('hashchange', syncPageWithHash)
+  }, [])
 
   useEffect(() => {
     let isCancelled = false
@@ -526,20 +542,17 @@ function App() {
           </div>
         </div>
         <nav className="topnav" aria-label="Main navigation">
-          <a href="#catalog">Catalog</a>
-          <a href="#browse">Collections</a>
-          <details className="project-menu">
-            <summary>Project info</summary>
-            <div className="project-menu-list">
-              <a href="#product">Product principles</a>
-              <a href="#architecture">Architecture</a>
-              <a href="#roadmap">Roadmap</a>
-            </div>
-          </details>
+          <a href="#catalog" aria-current={page === 'catalog' ? 'page' : undefined} onClick={() => window.scrollTo(0, 0)}>
+            Catalog
+          </a>
+          <a href="#project" aria-current={page === 'project' ? 'page' : undefined} onClick={() => window.scrollTo(0, 0)}>
+            About project
+          </a>
         </nav>
       </header>
 
       <main>
+        {page === 'catalog' && (
         <section className="browse-panel" id="browse">
           <div className="catalog-header">
             <div>
@@ -618,8 +631,10 @@ function App() {
             </div>
           ) : null}
         </section>
+        )}
 
-        <section className="hero">
+        {page === 'project' && (
+        <section className="hero" id="project">
           <div className="hero-copy">
             <span className="pill">Web first • product strategy</span>
             <h2>The reference platform for Warhammer book availability, catalog data and reading context.</h2>
@@ -645,7 +660,9 @@ function App() {
             </div>
           </div>
         </section>
+        )}
 
+        {page === 'project' && (
         <section className="feature-grid" id="product">
           {pillars.map((pillar) => (
             <article className="feature-card" key={pillar.title}>
@@ -655,7 +672,9 @@ function App() {
             </article>
           ))}
         </section>
+        )}
 
+        {page === 'project' && (
         <section className="details-grid" id="architecture">
           <div className="info-card">
             <span className="mini-label">Architecture</span>
@@ -677,7 +696,9 @@ function App() {
             </ul>
           </div>
         </section>
+        )}
 
+        {page === 'catalog' && (
         <section className="catalog-panel" id="catalog">
           <div className="catalog-header">
             <div>
@@ -946,7 +967,9 @@ function App() {
             </>
           )}
         </section>
+        )}
 
+        {page === 'project' && (
         <section className="roadmap" id="roadmap">
           <span className="mini-label">Roadmap</span>
           <h3>Build in stages, not all at once</h3>
@@ -959,6 +982,7 @@ function App() {
             ))}
           </ol>
         </section>
+        )}
       </main>
     </div>
   )
