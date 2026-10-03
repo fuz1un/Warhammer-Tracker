@@ -398,6 +398,130 @@
   box-shadow: 0 16px 28px rgba(0, 0, 0, 0.12);
 }
 
+.source-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: -2px;
+}
+
+.provenance-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 5px 9px;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+  font-weight: 700;
+}
+
+.provenance-chip.gold {
+  background: rgba(201, 168, 76, 0.12);
+  color: #f0d48a;
+  border-color: rgba(201, 168, 76, 0.35);
+}
+
+.provenance-chip.muted {
+  background: rgba(119, 128, 137, 0.12);
+  color: #dfe5ee;
+  border-color: rgba(146, 159, 176, 0.35);
+}
+
+.provenance-chip.blue {
+  background: rgba(94, 167, 255, 0.12);
+  color: #9ecbff;
+  border-color: rgba(94, 167, 255, 0.35);
+}
+
+.provenance-chip.green {
+  background: rgba(62, 207, 142, 0.12);
+  color: #8ae2b5;
+  border-color: rgba(62, 207, 142, 0.35);
+}
+
+.stock-history-panel {
+  margin: 18px 0;
+  border: 1px solid rgba(201, 168, 76, 0.18);
+  border-radius: 12px;
+  background: rgba(201, 168, 76, 0.04);
+  padding: 16px;
+}
+
+.stock-history-header {
+  margin-bottom: 12px;
+}
+
+.stock-history-header h4 {
+  margin: 4px 0 0;
+  font-size: 1rem;
+}
+
+.stock-history-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stock-history-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(201, 168, 76, 0.16);
+  background: rgba(13, 13, 13, 0.35);
+}
+
+.stock-history-row.gold {
+  border-color: rgba(201, 168, 76, 0.24);
+}
+
+.stock-history-row.muted {
+  border-color: rgba(146, 159, 176, 0.24);
+}
+
+.stock-history-row.blue {
+  border-color: rgba(94, 167, 255, 0.24);
+}
+
+.history-source {
+  display: block;
+  color: #c9a84c;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.stock-history-row strong {
+  font-size: 1rem;
+}
+
+.stock-history-row p {
+  margin: 0;
+  color: #d9c9a9;
+  line-height: 1.5;
+}
+
+.stock-history-row time {
+  color: #bcb4a6;
+  font-size: 0.85rem;
+}
+
+.stock-history-empty {
+  margin: 0;
+  color: #d9c9a9;
+  line-height: 1.5;
+}
+
+.stock-history-empty.error {
+  color: #f7a7a7;
+}
+
 .book-image-wrap {
   position: relative;
   overflow: hidden;

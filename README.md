@@ -160,8 +160,8 @@ This is intentionally conservative and should remain conservative. We do not gue
 - [x] book detail panel
 - [x] show summary, author, series, format and release date
 - [x] show inferred relations between authors and series
-- [ ] show stock history by source
-- [ ] show provenance badges clearly
+- [x] show stock history by source
+- [x] show provenance badges clearly
 
 ### Phase 4 — series and reading flow
 - [x] grouping by series

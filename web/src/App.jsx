@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import './App.css'
-import { filterBooksByCollection, filterBooksByStatus, getCollectionSummary, paginateBooks } from './collectionUtils.js'
+import {
+  filterBooksByCollection,
+  filterBooksByStatus,
+  getCollectionSummary,
+  getProvenanceBadges,
+  getStockHistoryStatusLabel,
+  paginateBooks,
+} from './collectionUtils.js'
 import {
   getWatchlistBooks,
   isBookWatched,
@@ -104,6 +111,7 @@ function App() {
   const [visibleCount, setVisibleCount] = useState(24)
   const [releaseSummary, setReleaseSummary] = useState(null)
   const [selectedBook, setSelectedBook] = useState(null)
+  const [stockHistoryResult, setStockHistoryResult] = useState(null)
   const [watchlist, setWatchlist] = useState(() => readWatchlist())
   const [watchlistOnly, setWatchlistOnly] = useState(false)
   const [watchlistStorageAvailable, setWatchlistStorageAvailable] = useState(true)
@@ -112,6 +120,11 @@ function App() {
     const nextWatchlist = toggleBookInWatchlist(watchlist, book)
     setWatchlist(nextWatchlist)
     setWatchlistStorageAvailable(writeWatchlist(nextWatchlist))
+  }
+
+  function showBookDetails(book) {
+    setStockHistoryResult(null)
+    setSelectedBook(book)
   }
 
   function showWatchlist() {
@@ -164,6 +177,39 @@ function App() {
       isCancelled = true
     }
   }, [tab])
+
+  useEffect(() => {
+    let isCancelled = false
+    const bookId = selectedBook?.id
+    const sourceType = String(selectedBook?.sourceType || 'official').trim().toLowerCase()
+
+    if (!bookId || ['curated-archive', 'archive', 'historical'].includes(sourceType)) {
+      return () => {
+        isCancelled = true
+      }
+    }
+
+    async function loadStockHistory() {
+      try {
+        const data = await fetchJson(`/api/history/${encodeURIComponent(bookId)}`)
+        if (!isCancelled) {
+          setStockHistoryResult({
+            bookId,
+            history: Array.isArray(data.history) ? data.history : [],
+            error: '',
+          })
+        }
+      } catch (err) {
+        if (!isCancelled) setStockHistoryResult({ bookId, history: [], error: err.message })
+      }
+    }
+
+    loadStockHistory()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [selectedBook?.id, selectedBook?.sourceType])
 
   const authorOptions = useMemo(() => {
     const values = new Set()
@@ -305,6 +351,12 @@ function App() {
     return [...groups.entries()].sort(([left], [right]) => left.localeCompare(right))
   }, [filteredBooks, tab])
 
+  const provenanceBadges = useMemo(() => getProvenanceBadges(selectedBook || {}), [selectedBook])
+  const selectedBookIsArchive = ['curated-archive', 'archive', 'historical'].includes(
+    String(selectedBook?.sourceType || '').trim().toLowerCase(),
+  )
+  const selectedBookHistory = stockHistoryResult?.bookId === selectedBook?.id ? stockHistoryResult : null
+
   const stats = useMemo(() => {
     const available = books.filter((book) => book.availabilityState === 'available').length
     const preorders = books.filter((book) => book.availabilityState === 'preorder').length
@@ -334,6 +386,14 @@ function App() {
               </div>
 
               <div className="book-modal-content">
+                  <div className="source-badges" aria-label="Provenance badges">
+                    {provenanceBadges.map((badge) => (
+                      <span key={`${badge.label}-${selectedBook.id || selectedBook.title}`} className={`provenance-chip ${badge.tone}`}>
+                        {badge.label}
+                      </span>
+                    ))}
+                  </div>
+
                 <div className="book-status large" style={{
                   borderColor: selectedBook.availabilityColor || '#c9a84c',
                   color: selectedBook.availabilityColor || '#f2d57c',
@@ -389,10 +449,46 @@ function App() {
                   <div className="metadata-source-list">
                     <span>Metadata sources</span>
                     {Object.entries(selectedBook.metadataSources).map(([field, source]) => (
-                      <a key={field} href={source.url} target="_blank" rel="noreferrer">{field}: {source.label}</a>
+                      <a key={field} href={source.sourceUrl || source.url} target="_blank" rel="noreferrer">
+                        {field}: {source.sourceUrl || source.url}
+                      </a>
                     ))}
                   </div>
                 ) : null}
+
+                <div className="stock-history-panel">
+                  <div className="stock-history-header">
+                    <span className="mini-label">Official stock history</span>
+                    <h4>Availability changes</h4>
+                  </div>
+                  {selectedBookIsArchive ? (
+                    <p className="stock-history-empty">Archive records are not monitored as live official stock.</p>
+                  ) : !selectedBook.id ? (
+                    <p className="stock-history-empty">This title has no official product ID for history lookup.</p>
+                  ) : !selectedBookHistory ? (
+                    <p className="stock-history-empty" role="status">Loading official history…</p>
+                  ) : selectedBookHistory.error ? (
+                    <p className="stock-history-empty error" role="alert">Could not load stock history: {selectedBookHistory.error}</p>
+                  ) : selectedBookHistory.history.length === 0 ? (
+                    <p className="stock-history-empty">No official observations recorded in the last seven days. Only titles monitored by the server are tracked.</p>
+                  ) : (
+                    <ol className="stock-history-list">
+                      {selectedBookHistory.history.map((entry, index) => (
+                        <li key={`${entry.ts}-${index}`} className="stock-history-row gold">
+                          <div>
+                            <span className="history-source">Official Black Library feed</span>
+                            <strong>{getStockHistoryStatusLabel(entry)}</strong>
+                          </div>
+                          {entry.ts ? (
+                            <time dateTime={entry.ts}>
+                              {new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(entry.ts))}
+                            </time>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </div>
 
                 <p className="detail-summary">
                   {selectedBook.summary || 'No summary available for this title yet.'}
@@ -724,7 +820,7 @@ function App() {
                           const statusStyle = { borderColor: book.availabilityColor || '#c9a84c', color: book.availabilityColor || '#f2d57c', background: `${book.availabilityColor || '#c9a84c'}1A` }
 
                           return (
-                            <article className="book-card" key={book.id || `${book.title}-${book.slug}`} onClick={() => setSelectedBook(book)}>
+                            <article className="book-card" key={book.id || `${book.title}-${book.slug}`} onClick={() => showBookDetails(book)}>
                               <div className="book-image-wrap">
                                 {book.image ? (
                                   <img src={book.image} alt={book.title || 'Warhammer book'} />
@@ -734,6 +830,14 @@ function App() {
                               </div>
 
                               <div className="book-status" style={statusStyle}>{statusText}</div>
+
+                              <div className="source-badges" aria-label={`Source badges for ${book.title}`}>
+                                {getProvenanceBadges(book).map((badge) => (
+                                  <span key={`${badge.label}-${book.id || book.title}`} className={`provenance-chip ${badge.tone}`}>
+                                    {badge.label}
+                                  </span>
+                                ))}
+                              </div>
 
                               <h4>{book.title || 'Untitled book'}</h4>
                               <p className="book-author">{book.author || book.authors?.join(', ') || 'Unknown author'}</p>
@@ -775,7 +879,7 @@ function App() {
                     const statusStyle = { borderColor: book.availabilityColor || '#c9a84c', color: book.availabilityColor || '#f2d57c', background: `${book.availabilityColor || '#c9a84c'}1A` }
 
                     return (
-                      <article className="book-card" key={book.id || `${book.title}-${book.slug}`} onClick={() => setSelectedBook(book)}>
+                      <article className="book-card" key={book.id || `${book.title}-${book.slug}`} onClick={() => showBookDetails(book)}>
                         <div className="book-image-wrap">
                           {book.image ? (
                             <img src={book.image} alt={book.title || 'Warhammer book'} />
@@ -785,6 +889,14 @@ function App() {
                         </div>
 
                         <div className="book-status" style={statusStyle}>{statusText}</div>
+
+                        <div className="source-badges" aria-label={`Source badges for ${book.title}`}>
+                          {getProvenanceBadges(book).map((badge) => (
+                            <span key={`${badge.label}-${book.id || book.title}`} className={`provenance-chip ${badge.tone}`}>
+                              {badge.label}
+                            </span>
+                          ))}
+                        </div>
 
                         <h4>{book.title || 'Untitled book'}</h4>
                         <p className="book-author">{book.author || book.authors?.join(', ') || 'Unknown author'}</p>

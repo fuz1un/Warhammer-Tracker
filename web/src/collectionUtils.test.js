@@ -1,6 +1,13 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { filterBooksByCollection, filterBooksByStatus, getCollectionSummary, paginateBooks } from './collectionUtils.js'
+import {
+  filterBooksByCollection,
+  filterBooksByStatus,
+  getCollectionSummary,
+  getProvenanceBadges,
+  getStockHistoryStatusLabel,
+  paginateBooks,
+} from './collectionUtils.js'
 
 test('matches books by author and series collection', () => {
   const books = [
@@ -45,4 +52,36 @@ test('builds readable collection headers and labels', () => {
   const seriesSummary = getCollectionSummary('series', 'The Long War', 3)
   assert.equal(seriesSummary.label, 'Series collection')
   assert.equal(seriesSummary.title, 'Series collection: The Long War')
+})
+
+test('builds provenance badges and labels official stock history states', () => {
+  const officialBook = {
+    title: 'The Long War',
+    sourceType: 'official',
+    availabilityState: 'preorder',
+    availabilityLabel: 'Pre-order',
+    availabilityMessage: 'Official stock is currently pre-order only.',
+    metadataSources: {
+      releaseDate: { sourceUrl: 'https://example.com/release', verifiedAt: '2026-09-19' },
+    },
+  }
+
+  const archiveBook = {
+    title: 'Warhammer 40,000',
+    sourceType: 'curated-archive',
+    availabilityState: 'sold-out-online',
+    availabilityLabel: 'Sold out online',
+    availabilityMessage: 'Archived recording, not live official stock.',
+  }
+
+  const officialBadges = getProvenanceBadges(officialBook)
+  assert.deepEqual(officialBadges.map((badge) => badge.label), ['Official stock', 'Metadata verified'])
+
+  const archiveBadges = getProvenanceBadges(archiveBook)
+  assert.deepEqual(archiveBadges.map((badge) => badge.label), ['Archive record'])
+
+  assert.equal(getStockHistoryStatusLabel({ availabilityState: 'preorder' }), 'Pre-order')
+  assert.equal(getStockHistoryStatusLabel({ availabilityState: 'sold-out-online' }), 'Sold out online')
+  assert.equal(getStockHistoryStatusLabel({ availabilityState: 'temporarily-out-of-stock' }), 'Temporarily out of stock')
+  assert.equal(getStockHistoryStatusLabel({ availabilityState: 'unrecognized' }), 'Unknown')
 })

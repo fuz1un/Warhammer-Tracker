@@ -67,3 +67,35 @@ export function getCollectionSummary(collectionType, collectionValue, totalItems
     title: safeValue ? `${label}: ${safeValue}` : label,
   }
 }
+
+export function getProvenanceBadges(book = {}) {
+  const badges = []
+  const sourceType = String(book.sourceType || 'official').trim().toLowerCase()
+
+  if (sourceType === 'curated-archive' || sourceType === 'archive' || sourceType === 'historical') {
+    badges.push({ label: 'Archive record', tone: 'muted' })
+  } else {
+    badges.push({ label: 'Official stock', tone: 'gold' })
+  }
+
+  if (book.metadataSources && Object.keys(book.metadataSources).length > 0) {
+    badges.push({ label: 'Metadata verified', tone: 'blue' })
+  }
+
+  if (book.isNewRelease) {
+    badges.push({ label: 'New release', tone: 'green' })
+  }
+
+  return badges
+}
+
+export function getStockHistoryStatusLabel(entry = {}) {
+  const labels = {
+    available: 'Available',
+    preorder: 'Pre-order',
+    'sold-out-online': 'Sold out online',
+    'temporarily-out-of-stock': 'Temporarily out of stock',
+  }
+
+  return labels[entry.availabilityState] || 'Unknown'
+}
